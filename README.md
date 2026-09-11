@@ -1,707 +1,455 @@
-# SQL Database Engineering
+# DSA in Java
 
-A practical SQL and database engineering repository focused on **relational database design, SQL querying, data relationships, normalization, and database fundamentals** using MySQL.
+A structured collection of **Data Structures and Algorithms problems implemented in Java**, focused on building strong problem-solving skills, understanding common DSA patterns, and writing clean, testable code.
 
-This repository is being developed progressively from SQL fundamentals toward **Java database integration, JPA/Hibernate, query optimization, transactions, and production-oriented database design**.
+The repository follows a progressive approach from fundamental array problems to string-based patterns and will continue toward more advanced data structures and algorithms.
 
 ---
 
 ## 🎯 Objectives
 
-The main objectives of this repository are to:
-
-* Build strong SQL fundamentals.
-* Understand relational database design.
-* Design normalized database schemas.
-* Work with primary keys and foreign keys.
-* Write practical SQL queries using joins and aggregation.
-* Understand `NULL` and relationship-based queries.
-* Practice database concepts using realistic datasets.
-* Build a foundation for JDBC, JPA, and Hibernate.
+* Build strong DSA fundamentals.
+* Learn common problem-solving patterns.
+* Implement algorithms from scratch in Java.
+* Understand time and space complexity.
+* Practice edge-case handling.
+* Write clean and maintainable code.
+* Validate solutions using automated JUnit tests.
+* Maintain a structured GitHub problem-solving portfolio.
 
 ---
 
-# 📚 Current Project — Library Management System
+# 📚 Problems
 
-The first database project is a small **Library Management System**.
-
-It models three core entities:
-
-```text
-┌──────────────┐
-│    Books     │
-└──────┬───────┘
-       │
-       │ 1
-       │
-       │ N
-┌──────▼───────┐
-│    Loans     │
-└──────▲───────┘
-       │
-       │ N
-       │
-       │ 1
-┌──────┴───────┐
-│   Members    │
-└──────────────┘
-```
-
-### Entities
-
-* **Books** — stores information about books.
-* **Members** — stores information about library members.
-* **Loans** — stores book borrowing transactions.
-
-A member can have multiple loans, while a book can appear in multiple loan records over time.
+|  # | Problem                         | Difficulty | Pattern            | Solution                                                                         |
+| -: | ------------------------------- | ---------- | ------------------ | -------------------------------------------------------------------------------- |
+|  1 | Two Sum                         | Easy       | Hash Map           | [View Solution](src/main/java/com/Tushar/dsajava/arrays/twosum)                  |
+|  2 | Best Time to Buy and Sell Stock | Easy       | One Pass           | [View Solution](src/main/java/com/Tushar/dsajava/arrays/besttimebuyandsellstock) |
+|  3 | Maximum Subarray                | Medium     | Kadane's Algorithm | [View Solution](src/main/java/com/Tushar/dsajava/arrays/maximumsubarray)         |
+|  4 | Valid Anagram                   | Easy       | Frequency Map      | [View Solution](src/main/java/com/Tushar/dsajava/strings/validanagram)           |
+|  5 | Valid Palindrome                | Easy       | Two Pointers       | [View Solution](src/main/java/com/Tushar/dsajava/strings/validpalindrome)        |
 
 ---
 
-# 🗄️ Database Schema
+# 🧠 Patterns Covered
 
-Database:
+## Arrays
 
-```text
-library
-```
+### Hash Map
 
-Tables:
+Used to efficiently store and look up previously seen values.
 
-```text
-library
-├── books
-├── members
-└── loans
-```
+**Problem:**
 
----
+* Two Sum
 
-## 1. Books
+### One Pass
 
-Stores information about books available in the library.
+Processes the array in a single traversal while maintaining the required state.
 
-| Column           | Type         | Constraint       | Purpose                |
-| ---------------- | ------------ | ---------------- | ---------------------- |
-| `book_id`        | INTEGER      | PRIMARY KEY      | Unique book identifier |
-| `title`          | VARCHAR(200) | NOT NULL         | Book title             |
-| `isbn`           | VARCHAR(20)  | UNIQUE, NOT NULL | Unique ISBN            |
-| `author`         | VARCHAR(150) | NOT NULL         | Author name            |
-| `published_year` | INTEGER      | —                | Publication year       |
+**Problem:**
+
+* Best Time to Buy and Sell Stock
+
+### Kadane's Algorithm
+
+Used to find the maximum sum of a contiguous subarray efficiently.
+
+**Problem:**
+
+* Maximum Subarray
 
 ---
 
-## 2. Members
+## Strings
 
-Stores information about library members.
+### Frequency Map
 
-| Column        | Type         | Constraint       | Purpose                  |
-| ------------- | ------------ | ---------------- | ------------------------ |
-| `member_id`   | INTEGER      | PRIMARY KEY      | Unique member identifier |
-| `name`        | VARCHAR(100) | NOT NULL         | Member name              |
-| `email`       | VARCHAR(150) | UNIQUE, NOT NULL | Member email             |
-| `joined_date` | DATE         | NOT NULL         | Membership date          |
+Counts character frequencies to compare the composition of two strings.
 
----
+**Problem:**
 
-## 3. Loans
+* Valid Anagram
 
-Stores borrowing transactions.
+### Two Pointers
 
-| Column        | Type    | Constraint            | Purpose                |
-| ------------- | ------- | --------------------- | ---------------------- |
-| `loan_id`     | INTEGER | PRIMARY KEY           | Unique loan identifier |
-| `book_id`     | INTEGER | FOREIGN KEY, NOT NULL | Borrowed book          |
-| `member_id`   | INTEGER | FOREIGN KEY, NOT NULL | Borrowing member       |
-| `loan_date`   | DATE    | NOT NULL              | Borrowing date         |
-| `due_date`    | DATE    | NOT NULL              | Expected return date   |
-| `return_date` | DATE    | NULL                  | Actual return date     |
+Uses pointers from both ends of a string and moves them toward the center.
 
----
+**Problem:**
 
-# 🔗 Relationships
-
-### Books → Loans
-
-One book can have many loan records over its lifetime.
-
-```text
-books.book_id
-      │
-      └──────────► loans.book_id
-```
-
-### Members → Loans
-
-One member can have multiple loan records.
-
-```text
-members.member_id
-      │
-      └──────────► loans.member_id
-```
-
-The `loans` table therefore represents the **transaction relationship** between books and members.
-
----
-
-# 🔐 Database Constraints
-
-The schema uses several important relational database constraints.
-
-### Primary Key
-
-Uniquely identifies each record.
-
-```sql
-PRIMARY KEY (book_id)
-```
-
-### Foreign Key
-
-Maintains relationships between tables and provides referential integrity.
-
-```sql
-FOREIGN KEY (book_id)
-REFERENCES books(book_id)
-```
-
-### NOT NULL
-
-Prevents required fields from containing `NULL`.
-
-```sql
-title VARCHAR(200) NOT NULL
-```
-
-### UNIQUE
-
-Prevents duplicate values.
-
-```sql
-email VARCHAR(150) UNIQUE
-```
-
-### CHECK
-
-Validates data based on a condition.
-
-```sql
-CHECK (due_date >= loan_date)
-```
-
----
-
-# 🧠 Design Decisions
-
-## Why separate books and members?
-
-Books and members are different entities with different attributes.
-
-Keeping them in separate tables avoids unnecessary duplication and makes the database easier to maintain.
-
----
-
-## Why does loans store IDs instead of names?
-
-The `loans` table stores:
-
-```text
-book_id
-member_id
-```
-
-instead of:
-
-```text
-book_title
-member_name
-```
-
-This avoids repeatedly storing the same information.
-
-For example, if a member changes their name, only the `members` table needs to be updated.
-
----
-
-## Why use foreign keys?
-
-Foreign keys ensure that a loan references an existing book and member.
-
-For example:
-
-```text
-loans.book_id → books.book_id
-loans.member_id → members.member_id
-```
-
-This prevents invalid relationships and maintains referential integrity.
-
----
-
-# 📐 Normalization
-
-The current schema follows basic normalization principles.
-
-## First Normal Form — 1NF
-
-Each column contains atomic values.
-
-For example:
-
-```text
-name  → Rahul
-email → rahul@example.com
-```
-
-A column does not contain multiple independent values.
-
----
-
-## Second Normal Form — 2NF
-
-Each non-key attribute depends on the appropriate primary key.
-
-For example:
-
-```text
-book_id → title, isbn, author, published_year
-```
-
-and:
-
-```text
-member_id → name, email, joined_date
-```
-
----
-
-## Third Normal Form — 3NF
-
-Non-key attributes depend on the key rather than on other non-key attributes.
-
-For example, member information belongs in `members` instead of being repeatedly stored in `loans`.
-
----
-
-# 👥 Multiple Authors — Future Improvement
-
-The current design stores one author in the `books` table:
-
-```text
-author
-```
-
-This is acceptable for the initial project but does not scale well when a book has multiple authors.
-
-For example:
-
-```text
-Book A → Author A, Author B, Author C
-```
-
-A better normalized design would introduce:
-
-```text
-books
-authors
-book_authors
-```
-
-where `book_authors` acts as a bridge table.
-
-```text
-Books
-  │
-  │ M:N
-  │
-Book_Authors
-  │
-  │ M:N
-  │
-Authors
-```
-
-This represents a **many-to-many relationship** between books and authors.
-
----
-
-# 📊 Sample Dataset
-
-## Books
-
-| ID | Title                                 | Author               |
-| -: | ------------------------------------- | -------------------- |
-|  1 | Clean Code                            | Robert C. Martin     |
-|  2 | Effective Java                        | Joshua Bloch         |
-|  3 | Database System Concepts              | Abraham Silberschatz |
-|  4 | Designing Data-Intensive Applications | Martin Kleppmann     |
-
-## Members
-
-| ID | Name  | Email                                         |
-| -: | ----- | --------------------------------------------- |
-|  1 | Rahul | [rahul@example.com](mailto:rahul@example.com) |
-|  2 | Priya | [priya@example.com](mailto:priya@example.com) |
-|  3 | Amit  | [amit@example.com](mailto:amit@example.com)   |
-|  4 | Sneha | [sneha@example.com](mailto:sneha@example.com) |
-
-## Loans
-
-| ID |                                  Book | Member | Loan Date  | Due Date   | Returned |
-| -: | ------------------------------------: | -----: | ---------- | ---------- | -------- |
-|  1 |                            Clean Code |  Rahul | 2026-08-01 | 2026-08-15 | No       |
-|  2 |                        Effective Java |  Rahul | 2026-08-05 | 2026-08-19 | Yes      |
-|  3 |              Database System Concepts |  Priya | 2026-09-01 | 2026-09-15 | No       |
-|  4 | Designing Data-Intensive Applications |  Priya | 2026-09-05 | 2026-09-19 | No       |
-
----
-
-# 🔎 SQL Queries
-
-The repository currently contains five practical queries.
-
-## 1. Find Overdue Loans
-
-Uses:
-
-* `INNER JOIN`
-* `WHERE`
-* `NULL` handling
-* Date comparison
-
-Finds loans where the book has not been returned and the due date has passed.
-
-```sql
-SELECT
-    m.name AS member_name,
-    b.title AS book_title,
-    l.due_date
-FROM library.loans l
-JOIN library.members m
-    ON l.member_id = m.member_id
-JOIN library.books b
-    ON l.book_id = b.book_id
-WHERE l.return_date IS NULL
-  AND l.due_date < CURRENT_DATE;
-```
-
-### Expected Result
-
-| Member | Book       | Due Date   |
-| ------ | ---------- | ---------- |
-| Rahul  | Clean Code | 2026-08-15 |
-
----
-
-## 2. Count Loans Per Member
-
-Uses:
-
-* `LEFT JOIN`
-* `GROUP BY`
-* `COUNT()`
-
-```sql
-SELECT
-    m.member_id,
-    m.name,
-    COUNT(l.loan_id) AS total_loans
-FROM library.members m
-LEFT JOIN library.loans l
-    ON m.member_id = l.member_id
-GROUP BY m.member_id, m.name;
-```
-
-### Expected Result
-
-| Member | Total Loans |
-| ------ | ----------: |
-| Rahul  |           2 |
-| Priya  |           2 |
-| Amit   |           0 |
-| Sneha  |           0 |
-
-The `LEFT JOIN` ensures that members with zero loans are also included.
-
----
-
-## 3. Find Members With No Loans
-
-Uses:
-
-* `LEFT JOIN`
-* `IS NULL`
-
-```sql
-SELECT
-    m.member_id,
-    m.name,
-    m.email
-FROM library.members m
-LEFT JOIN library.loans l
-    ON m.member_id = l.member_id
-WHERE l.loan_id IS NULL;
-```
-
-### Expected Result
-
-| Member | Email                                         |
-| ------ | --------------------------------------------- |
-| Amit   | [amit@example.com](mailto:amit@example.com)   |
-| Sneha  | [sneha@example.com](mailto:sneha@example.com) |
-
-### Important SQL Pattern
-
-```sql
-LEFT JOIN
-WHERE right_table.id IS NULL
-```
-
-This is a common pattern for finding records that **do not have a matching record**.
-
----
-
-## 4. List Currently Borrowed Books
-
-Uses:
-
-* `INNER JOIN`
-* Multiple table joins
-* `IS NULL`
-
-```sql
-SELECT
-    b.title AS book_title,
-    m.name AS member_name,
-    l.loan_date,
-    l.due_date
-FROM library.loans l
-JOIN library.books b
-    ON l.book_id = b.book_id
-JOIN library.members m
-    ON l.member_id = m.member_id
-WHERE l.return_date IS NULL;
-```
-
-### Expected Result
-
-| Book                                  | Member | Loan Date  | Due Date   |
-| ------------------------------------- | ------ | ---------- | ---------- |
-| Clean Code                            | Rahul  | 2026-08-01 | 2026-08-15 |
-| Database System Concepts              | Priya  | 2026-09-01 | 2026-09-15 |
-| Designing Data-Intensive Applications | Priya  | 2026-09-05 | 2026-09-19 |
-
----
-
-## 5. Count Loans Per Book
-
-Uses:
-
-* `LEFT JOIN`
-* `GROUP BY`
-* `COUNT()`
-* `ORDER BY`
-
-```sql
-SELECT
-    b.book_id,
-    b.title,
-    COUNT(l.loan_id) AS loan_count
-FROM library.books b
-LEFT JOIN library.loans l
-    ON b.book_id = l.book_id
-GROUP BY b.book_id, b.title
-ORDER BY loan_count DESC;
-```
-
-### Expected Result
-
-| Book                                  | Loan Count |
-| ------------------------------------- | ---------: |
-| Clean Code                            |          1 |
-| Effective Java                        |          1 |
-| Database System Concepts              |          1 |
-| Designing Data-Intensive Applications |          1 |
-
----
-
-# 🧩 SQL Concepts Practiced
-
-| Concept        | Usage                      |
-| -------------- | -------------------------- |
-| `SELECT`       | Retrieve data              |
-| `WHERE`        | Filter records             |
-| `INNER JOIN`   | Match related records      |
-| `LEFT JOIN`    | Preserve unmatched records |
-| `GROUP BY`     | Group records              |
-| `COUNT()`      | Aggregate records          |
-| `ORDER BY`     | Sort results               |
-| `IS NULL`      | Check missing values       |
-| `CURRENT_DATE` | Work with current date     |
-| Primary Key    | Identify records           |
-| Foreign Key    | Create relationships       |
-| `NOT NULL`     | Enforce required values    |
-| `UNIQUE`       | Prevent duplicates         |
-| `CHECK`        | Validate data              |
-
----
-
-# 🛠️ Tools & Technologies
-
-* **MySQL**
-* **MySQL Workbench**
-* **SQL**
-* **Git**
-* **GitHub**
-* **IntelliJ IDEA**
+* Valid Palindrome
 
 ---
 
 # 📁 Project Structure
 
 ```text
-sql-database-engineering/
+dsa-java/
 │
-├── schema.sql
-├── queries.sql
+├── src/
+│   ├── main/
+│   │   └── java/
+│   │       └── com/
+│   │           └── Tushar/
+│   │               └── dsajava/
+│   │                   │
+│   │                   ├── arrays/
+│   │                   │   ├── twosum/
+│   │                   │   │   ├── Solution.java
+│   │                   │   │   └── README.md
+│   │                   │   │
+│   │                   │   ├── besttimebuyandsellstock/
+│   │                   │   │   ├── Solution.java
+│   │                   │   │   └── README.md
+│   │                   │   │
+│   │                   │   └── maximumsubarray/
+│   │                   │       ├── Solution.java
+│   │                   │       └── README.md
+│   │                   │
+│   │                   └── strings/
+│   │                       ├── validanagram/
+│   │                       │   ├── Solution.java
+│   │                       │   └── README.md
+│   │                       │
+│   │                       └── validpalindrome/
+│   │                           ├── Solution.java
+│   │                           └── README.md
+│   │
+│   └── test/
+│       └── java/
+│           └── com/
+│               └── Tushar/
+│                   └── dsajava/
+│                       ├── arrays/
+│                       └── strings/
+│
 ├── README.md
+├── pom.xml
 └── .gitignore
 ```
 
-### `schema.sql`
+---
 
-Contains:
+# 🏗️ Package Structure
 
-* Database creation
-* Table definitions
-* Primary keys
-* Foreign keys
-* Constraints
-* Sample data
+All problems use a single consistent package root:
 
-### `queries.sql`
+```text
+com.Tushar.dsajava
+```
 
-Contains practical SQL queries for analyzing the library database.
+The repository is organized by DSA category:
 
-### `README.md`
+```text
+com.Tushar.dsajava
+├── arrays
+└── strings
+```
 
-Contains:
-
-* Database documentation
-* Schema explanation
-* Design decisions
-* Normalization
-* Sample data
-* Query explanations
-* Expected results
-* SQL concepts
+This avoids maintaining multiple package roots and keeps the Java project consistent as more problems are added.
 
 ---
 
-# 🚀 Learning Roadmap
+# 📝 Problem Documentation Structure
 
-The repository will progressively move from SQL fundamentals toward database engineering.
+Each problem contains its own `README.md` with:
+
+1. Problem
+2. Approach
+3. Why This Approach?
+4. Time Complexity
+5. Space Complexity
+6. Edge Cases
+
+This makes every solution independently understandable and interview-ready.
+
+---
+
+# 🧪 Testing
+
+Solutions are tested using **JUnit 5**.
+
+Tests cover:
+
+* Normal cases
+* Edge cases
+* Empty input
+* Single-element/single-character input
+* Invalid input scenarios where applicable
+
+Run all tests using:
+
+```bash
+mvn test
+```
+
+Expected result:
 
 ```text
-SQL Fundamentals
-       ↓
-Relational Database Design
-       ↓
-Joins & Aggregations
-       ↓
-Normalization
-       ↓
-Subqueries
-       ↓
-CTEs
-       ↓
-Window Functions
-       ↓
-Indexes
-       ↓
-Query Optimization
-       ↓
-Transactions
-       ↓
-ACID Properties
-       ↓
-Concurrency & Isolation
-       ↓
-JDBC
-       ↓
-Java + MySQL
-       ↓
-JPA / Hibernate
-       ↓
-Production Database Design
+Tests run: ...
+Failures: 0
+Errors: 0
+Skipped: 0
+
+BUILD SUCCESS
 ```
 
 ---
 
-# 📌 Current Progress
+# 🔍 Current Problems
 
-### Database Fundamentals
+## 1. Two Sum
 
-* [x] Schema creation
-* [x] Table design
-* [x] Primary keys
-* [x] Foreign keys
-* [x] `NOT NULL`
-* [x] `UNIQUE`
-* [x] `CHECK` constraints
-* [x] One-to-many relationships
-* [x] Basic normalization
+**Pattern:** Hash Map
 
-### SQL
+Finds two numbers in an array whose sum equals a given target.
 
-* [x] `SELECT`
-* [x] `WHERE`
-* [x] `INNER JOIN`
-* [x] `LEFT JOIN`
-* [x] `GROUP BY`
-* [x] `COUNT()`
-* [x] `ORDER BY`
-* [x] `NULL` handling
-* [x] Date filtering
-* [x] Multi-table queries
+**Key idea:**
 
-### Future
+Store previously seen values in a hash map and check whether the required complement already exists.
 
-* [ ] Subqueries
-* [ ] CTEs
-* [ ] Window functions
-* [ ] Indexing
-* [ ] Query optimization
-* [ ] Transactions
-* [ ] ACID
-* [ ] Isolation levels
-* [ ] JDBC
-* [ ] JPA
-* [ ] Hibernate
-* [ ] Advanced database design
+**Complexity:**
+
+```text
+Time  → O(n)
+Space → O(n)
+```
 
 ---
 
-# 🎯 Long-Term Goal
+## 2. Best Time to Buy and Sell Stock
 
-The goal of this repository is not only to learn SQL syntax but to develop the ability to **design, query, integrate, and reason about relational databases in real software systems**.
+**Pattern:** One Pass
 
-The progression is:
+Finds the maximum profit from buying and selling a stock once.
+
+**Key idea:**
+
+Maintain the minimum price seen so far and calculate the maximum possible profit at every position.
+
+**Complexity:**
 
 ```text
-Design the Database
-        ↓
-Write Correct SQL
-        ↓
-Understand Relationships
-        ↓
-Optimize Queries
-        ↓
-Handle Transactions
-        ↓
-Integrate with Java
-        ↓
-Build Database-Driven Applications
+Time  → O(n)
+Space → O(1)
 ```
 
-This repository will serve as the database foundation for future **Java backend and Spring Boot projects**.
+---
+
+## 3. Maximum Subarray
+
+**Pattern:** Kadane's Algorithm
+
+Finds the contiguous subarray with the largest sum.
+
+**Key idea:**
+
+At every element, decide whether to extend the current subarray or start a new one.
+
+**Complexity:**
+
+```text
+Time  → O(n)
+Space → O(1)
+```
+
+---
+
+## 4. Valid Anagram
+
+**Pattern:** Frequency Map
+
+Determines whether two strings contain the same characters with the same frequencies.
+
+**Key idea:**
+
+Count the frequency of every character in the first string and decrement those frequencies while processing the second string.
+
+A length check is performed first to immediately reject strings of different lengths.
+
+**Complexity:**
+
+```text
+Time  → O(n)
+Space → O(k)
+```
+
+where `k` represents the number of distinct characters.
+
+### Important Edge Cases
+
+* Different-length strings
+* Empty strings
+* Single characters
+* Different character frequencies
+
+---
+
+## 5. Valid Palindrome
+
+**Pattern:** Two Pointers
+
+Determines whether a string is a palindrome after ignoring non-alphanumeric characters and letter case.
+
+**Key idea:**
+
+Use two pointers:
+
+```text
+left  → beginning
+right → end
+```
+
+Skip non-alphanumeric characters from both sides and compare the remaining characters.
+
+**Complexity:**
+
+```text
+Time  → O(n)
+Space → O(1)
+```
+
+### Important Edge Cases
+
+* Empty string
+* Single character
+* Mixed case
+* Spaces
+* Punctuation
+* String containing only punctuation
+
+Example:
+
+```text
+A man, a plan, a canal: Panama
+```
+
+returns:
+
+```text
+true
+```
+
+while:
+
+```text
+race a car
+```
+
+returns:
+
+```text
+false
+```
+
+---
+
+# 📊 Complexity Summary
+
+| Problem                         | Time | Space | Pattern            |
+| ------------------------------- | ---: | ----: | ------------------ |
+| Two Sum                         | O(n) |  O(n) | Hash Map           |
+| Best Time to Buy and Sell Stock | O(n) |  O(1) | One Pass           |
+| Maximum Subarray                | O(n) |  O(1) | Kadane's Algorithm |
+| Valid Anagram                   | O(n) |  O(k) | Frequency Map      |
+| Valid Palindrome                | O(n) |  O(1) | Two Pointers       |
+
+---
+
+# 🛠️ Technologies
+
+* **Java 21**
+* **Maven**
+* **JUnit 5**
+* **IntelliJ IDEA**
+* **Git**
+* **GitHub**
+
+---
+
+# 🌱 Learning Roadmap
+
+The repository will progressively cover the major DSA patterns and data structures.
+
+```text
+Arrays
+  ↓
+Strings
+  ↓
+Hashing
+  ↓
+Linked Lists
+  ↓
+Stacks & Queues
+  ↓
+Binary Search
+  ↓
+Trees
+  ↓
+Binary Search Trees
+  ↓
+Heaps / Priority Queues
+  ↓
+Graphs
+  ↓
+Recursion & Backtracking
+  ↓
+Dynamic Programming
+  ↓
+Advanced Algorithms
+```
+
+---
+
+# 📈 Progress
+
+### Arrays
+
+* [x] Two Sum
+* [x] Best Time to Buy and Sell Stock
+* [x] Maximum Subarray
+
+### Strings
+
+* [x] Valid Anagram
+* [x] Valid Palindrome
+
+### Upcoming
+
+* [ ] More Hashing Problems
+* [ ] Linked Lists
+* [ ] Stacks
+* [ ] Queues
+* [ ] Binary Search
+* [ ] Trees
+* [ ] Heaps
+* [ ] Graphs
+* [ ] Recursion
+* [ ] Backtracking
+* [ ] Dynamic Programming
+
+---
+
+# 🎯 Goal
+
+The goal of this repository is to develop strong **problem-solving ability and DSA fundamentals in Java** through consistent implementation and testing.
+
+The focus is on:
+
+```text
+Understand the Problem
+        ↓
+Identify the Pattern
+        ↓
+Design the Approach
+        ↓
+Implement in Java
+        ↓
+Analyze Complexity
+        ↓
+Test Edge Cases
+        ↓
+Document the Solution
+```
+
+Each problem is intended to strengthen both **coding ability and algorithmic reasoning** for technical interviews and competitive programming.
