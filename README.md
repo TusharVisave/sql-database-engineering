@@ -808,14 +808,204 @@ WHERE return_date = NULL;
 
 ---
 
+
+---
+
+# ⚡ Day 3 — Indexing & Query Optimization
+
+A deep dive into **B-Tree indexing mechanics, query execution plans (`EXPLAIN` and `EXPLAIN ANALYZE`), storage/write trade-offs, and composite indexes** using a 10,000-row `orders` dataset.
+
+For the full theoretical and internal architectural breakdown, see [docs/indexing.md](file:///c:/Users/Commit/Desktop/sql-database-engineering/docs/indexing.md).
+
+---
+
+## 🔬 Benchmark Setup
+
+* **Database**: `order_management`
+* **Table**: `orders` ([schema/indexing/01_orders_table.sql](file:///c:/Users/Commit/Desktop/sql-database-engineering/schema/indexing/01_orders_table.sql))
+* **Dataset Size**: **10,000 rows** generated via [seeds/generate_orders_seed.py](file:///c:/Users/Commit/Desktop/sql-database-engineering/seeds/generate_orders_seed.py) (stored in [seeds/orders_seed.sql](file:///c:/Users/Commit/Desktop/sql-database-engineering/seeds/orders_seed.sql))
+* **Target Query**:
+  ```sql
+  SELECT *
+  FROM orders
+  WHERE customer_email = 'sophia.miller@example.com';
+  ```
+* **Target Row Count**: Exactly **5 matching rows** scattered throughout the 10,000 records.
+
+---
+
+## 📊 Before vs. After Performance Comparison
+
+| Metric | Without Index (Baseline) | With B-Tree Index (`idx_orders_customer_email`) | Performance Gain |
+| :--- | :--- | :--- | :--- |
+| **Access Type (`type`)** | `ALL` (Full Table Scan) | `ref` (Index Lookup) | **Eliminated sequential table scan** |
+| **Possible Keys** | `NULL` | `idx_orders_customer_email` | Index available |
+| **Selected Key** | `NULL` | `idx_orders_customer_email` | B-tree index utilized |
+| **Key Length (`key_len`)** | `NULL` | `602` bytes ($150 \times 4 + 2$ bytes) | Exact utf8mb4 prefix match |
+| **Rows Examined (`rows`)** | **10,000 rows** | **5 rows** | **2,000x fewer rows read** |
+| **Filtered Percentage** | `10.00%` | `100.00%` | **100% precision at storage layer** |
+| **Optimizer Cost Units** | `1025.75` | `1.75` | **586x lower query cost** |
+| **Actual Execution Time** | **7.82 ms** | **0.08 ms** | **~97x faster execution** |
+
+---
+
+## 🔍 Query Plan Evidence (Raw Outputs)
+
+### 1. BEFORE Indexing (Full Table Scan)
+
+Without a secondary index on `customer_email`, the storage engine must load and scan all 10,000 rows sequentially across every data page in InnoDB.
+
+#### Standard EXPLAIN (Tabular)
+```text
++----+-------------+--------+------------+------+---------------+------+---------+------+-------+----------+-------------+
+| id | select_type | table  | partitions | type | possible_keys | key  | key_len | ref  | rows  | filtered | Extra       |
++----+-------------+--------+------------+------+---------------+------+---------+------+-------+----------+-------------+
+|  1 | SIMPLE      | orders | NULL       | ALL  | NULL          | NULL | NULL    | NULL | 10000 |    10.00 | Using where |
++----+-------------+--------+------------+------+---------------+------+---------+------+-------+----------+-------------+
+```
+
+#### EXPLAIN FORMAT=JSON
+```json
+{
+  "query_block": {
+    "select_id": 1,
+    "cost_info": {
+      "query_cost": "1025.75"
+    },
+    "table": {
+      "table_name": "orders",
+      "access_type": "ALL",
+      "rows_examined_per_scan": 10000,
+      "rows_produced_per_join": 1000,
+      "filtered": "10.00",
+      "cost_info": {
+        "read_cost": "925.75",
+        "eval_cost": "100.00",
+        "prefix_cost": "1025.75",
+        "data_read_per_join": "1M"
+      },
+      "used_columns": [
+        "order_id",
+        "customer_id",
+        "customer_name",
+        "customer_email",
+        "order_amount",
+        "order_status",
+        "order_date",
+        "created_at"
+      ],
+      "attached_condition": "(`order_management`.`orders`.`customer_email` = 'sophia.miller@example.com')"
+    }
+  }
+}
+```
+
+#### EXPLAIN ANALYZE (Hardware Execution Profile)
+```text
+-> Filter: (orders.customer_email = 'sophia.miller@example.com')  (cost=1025.75 rows=1000) (actual time=0.184..7.818 rows=5 loops=1)
+    -> Table scan on orders  (cost=1025.75 rows=10000) (actual time=0.042..6.950 rows=10000 loops=1)
+```
+
+---
+
+### 2. Adding the Index
+
+```sql
+CREATE INDEX idx_orders_customer_email ON orders (customer_email);
+```
+
+This constructs a secondary B+Tree where each leaf page stores the sorted `customer_email` keys paired with their corresponding clustered index primary key (`order_id`).
+
+---
+
+### 3. AFTER Indexing (Index Ref Lookup)
+
+With the B-Tree in place, MySQL performs a root-to-leaf binary search to pinpoint the 5 matching entries, fetching each row via a clustered index bookmark lookup.
+
+#### Standard EXPLAIN (Tabular)
+```text
++----+-------------+--------+------------+------+---------------------------+---------------------------+---------+-------+------+----------+-------+
+| id | select_type | table  | partitions | type | possible_keys             | key                       | key_len | ref   | rows | filtered | Extra |
++----+-------------+--------+------------+------+---------------------------+---------------------------+---------+-------+------+----------+-------+
+|  1 | SIMPLE      | orders | NULL       | ref  | idx_orders_customer_email | idx_orders_customer_email | 602     | const |    5 |   100.00 | NULL  |
++----+-------------+--------+------------+------+---------------------------+---------------------------+---------+-------+------+----------+-------+
+```
+
+#### EXPLAIN FORMAT=JSON
+```json
+{
+  "query_block": {
+    "select_id": 1,
+    "cost_info": {
+      "query_cost": "1.75"
+    },
+    "table": {
+      "table_name": "orders",
+      "access_type": "ref",
+      "possible_keys": [
+        "idx_orders_customer_email"
+      ],
+      "key": "idx_orders_customer_email",
+      "used_key_parts": [
+        "customer_email"
+      ],
+      "key_length": "602",
+      "ref": [
+        "const"
+      ],
+      "rows_examined_per_scan": 5,
+      "rows_produced_per_join": 5,
+      "filtered": "100.00",
+      "cost_info": {
+        "read_cost": "1.25",
+        "eval_cost": "0.50",
+        "prefix_cost": "1.75",
+        "data_read_per_join": "5K"
+      },
+      "used_columns": [
+        "order_id",
+        "customer_id",
+        "customer_name",
+        "customer_email",
+        "order_amount",
+        "order_status",
+        "order_date",
+        "created_at"
+      ]
+    }
+  }
+}
+```
+
+#### EXPLAIN ANALYZE (Hardware Execution Profile)
+```text
+-> Index lookup on orders using idx_orders_customer_email (customer_email='sophia.miller@example.com')  (cost=1.75 rows=5) (actual time=0.038..0.082 rows=5 loops=1)
+```
+
+---
+
+## 💡 Engineering Takeaways
+
+### 1. Why "Index Everything" is Wrong: The Cost of Indexing
+* **Write Penalty**: For every `INSERT`, MySQL must insert the record into the primary clustered index **plus every secondary B-Tree**. A table with 6 indexes requires 7 distinct tree modifications per insert.
+* **Page Splits**: When an insert hits a full 16 KB leaf page, InnoDB must allocate a new page, migrate ~50% of the keys, update sibling doubly-linked pointers, and insert parent pointers. This generates heavy Redo/Undo logging and stalls concurrency.
+* **Memory & Storage**: Secondary indexes consume significant disk space and compete for space in the `innodb_buffer_pool`. Excess index pages evict active table data pages, causing cache thrashing.
+
+### 2. Composite Index vs. Two Separate Indexes
+* **Composite Index `(customer_email, order_date)`**: Single B-tree sorted first by `customer_email`, then by `order_date`. Best when queries filter on both columns (`WHERE customer_email = ? AND order_date >= ?`). Follows the **Leftmost Prefix Rule** (can also satisfy queries filtering on `customer_email` alone).
+* **Two Separate Indexes**: Necessary when queries frequently filter on `customer_email` independently **and** on `order_date` independently. When queried together, MySQL must pick one index or perform an expensive **Index Merge** (`Using intersect`).
+
+---
+
 # 🛠️ Tools & Technologies
 
-* **MySQL**
+* **MySQL 8.0**
 * **MySQL Workbench**
 * **SQL**
 * **Git**
 * **GitHub**
 * **IntelliJ IDEA**
+* **Python 3** (Data generation scripts)
 
 ---
 
@@ -827,9 +1017,14 @@ sql-database-engineering/
 ├── schema.sql
 ├── queries.sql
 ├── seeds/
-│   └── library_seed.sql
+│   ├── library_seed.sql
+│   ├── generate_orders_seed.py
+│   └── orders_seed.sql
 │
 ├── schema/
+│   ├── indexing/
+│   │   ├── 01_orders_table.sql
+│   │   └── 02_indexing_benchmarks.sql
 │   ├── normalization/
 │   │   ├── 01_unnormalized.sql
 │   │   ├── 02_1nf.sql
@@ -842,6 +1037,7 @@ sql-database-engineering/
 │       └── 03_validation.sql
 │
 ├── docs/
+│   ├── indexing.md
 │   ├── normalization.md
 │   └── relationships.md
 │
@@ -860,21 +1056,27 @@ Contains:
 Contains 5 practical SQL analytical queries on the library database (overdue loans, loan counts, member activity, null filtering).
 
 ### `seeds/`
-Contains standalone SQL seed scripts:
+Contains standalone SQL and programmatic seed scripts:
 * `library_seed.sql` — Populates sample books, members, and loans.
+* `generate_orders_seed.py` — Python script generating 10,000 synthetic order records in batch inserts.
+* `orders_seed.sql` — 10,000-row batch dataset for indexing and query plan profiling.
 
 ### `schema/`
 Contains modular SQL exercises:
+* **`indexing/`**:
+  - `01_orders_table.sql`: 10,000-row orders schema without secondary indexes.
+  - `02_indexing_benchmarks.sql`: Query plans, index creation, composite index tests, covering indexes, and storage metrics.
 * **`normalization/`**: Demonstrates decomposing an order management schema through UNF → 1NF → 2NF → 3NF along with full integrity validation queries.
 * **`relationships/`**: Demonstrates resolving Many-to-Many relationships via junction tables (`product_categories`), foreign key cascades, and category aggregations.
 
 ### `docs/`
 Contains conceptual deep-dives and design documentation:
+* `indexing.md` — B-Tree internals, clustered vs secondary indexes, write penalties, page splits, execution plans, and interview solutions.
 * `normalization.md` — Normalization theory, anomaly prevention, and 1NF–3NF progression.
 * `relationships.md` — Cardinality (1:1, 1:N, M:N), junction tables, cascading foreign keys, and join queries.
 
 ### `README.md`
-Contains comprehensive schema documentation, design decisions, query traces, and learning roadmaps.
+Contains comprehensive schema documentation, design decisions, query traces, benchmark results, and learning roadmaps.
 
 ---
 
@@ -891,6 +1093,8 @@ Joins & Aggregations
        ↓
 Normalization
        ↓
+Indexes & Execution Plans (Day 3)
+       ↓
 Subqueries
        ↓
 HAVING
@@ -900,10 +1104,6 @@ CASE Expressions
 Common Table Expressions
        ↓
 Window Functions
-       ↓
-Indexes
-       ↓
-Query Optimization
        ↓
 Transactions
        ↓
@@ -936,9 +1136,11 @@ Production Database Design
 * [x] `UNIQUE`
 * [x] `CHECK` constraints
 * [x] One-to-many relationships
-* [x] Basic normalization
+* [x] Many-to-many relationships (junction tables)
+* [x] Basic normalization (1NF, 2NF, 3NF)
+* [x] Indexing (B-Tree, Clustered, Secondary, Composite)
 
-## SQL
+## SQL & Performance
 
 * [x] `SELECT`
 * [x] `WHERE`
@@ -952,6 +1154,8 @@ Production Database Design
 * [x] Multi-table queries
 * [x] Aggregation
 * [x] Anti-join pattern
+* [x] Execution Plan Analysis (`EXPLAIN` & `EXPLAIN ANALYZE`)
+* [x] Index Optimization (Full Table Scan → B-Tree Index Lookup)
 
 ## Future
 
@@ -960,8 +1164,6 @@ Production Database Design
 * [ ] `CASE`
 * [ ] CTEs
 * [ ] Window functions
-* [ ] Indexing
-* [ ] Query optimization
 * [ ] Transactions
 * [ ] ACID properties
 * [ ] Isolation levels
