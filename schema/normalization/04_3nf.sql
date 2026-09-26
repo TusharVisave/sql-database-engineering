@@ -34,6 +34,9 @@
 -- Drop tables if they already exist
 -- ============================================================
 
+CREATE DATABASE IF NOT EXISTS order_management;
+USE order_management;
+
 DROP TABLE IF EXISTS order_items_3nf;
 DROP TABLE IF EXISTS orders_3nf;
 DROP TABLE IF EXISTS products_3nf;

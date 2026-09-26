@@ -1,46 +1,12 @@
-CREATE SCHEMA IF NOT EXISTS library;
-
-CREATE TABLE IF NOT EXISTS library.books (
-    book_id INTEGER PRIMARY KEY,
-    title VARCHAR(200) NOT NULL,
-    isbn VARCHAR(20) NOT NULL UNIQUE,
-    author VARCHAR(150) NOT NULL,
-    published_year INTEGER
-);
-
-CREATE TABLE IF NOT EXISTS library.members (
-    member_id INTEGER PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(150) NOT NULL UNIQUE,
-    joined_date DATE NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS library.loans (
-    loan_id INTEGER PRIMARY KEY,
-    book_id INTEGER NOT NULL,
-    member_id INTEGER NOT NULL,
-    loan_date DATE NOT NULL,
-    due_date DATE NOT NULL,
-    return_date DATE,
-
-    CONSTRAINT fk_loan_book
-        FOREIGN KEY (book_id)
-            REFERENCES library.books(book_id),
-
-    CONSTRAINT fk_loan_member
-        FOREIGN KEY (member_id)
-            REFERENCES library.members(member_id),
-
-    CONSTRAINT chk_due_date
-        CHECK (due_date >= loan_date),
-
-    CONSTRAINT chk_return_date
-        CHECK (return_date IS NULL OR return_date >= loan_date)
-);
-
 -- ============================================================
--- Sample Data
+-- SEED DATA: LIBRARY MANAGEMENT SYSTEM
 -- ============================================================
+
+USE library;
+
+-- ------------------------------------------------------------
+-- 1. Books
+-- ------------------------------------------------------------
 
 INSERT INTO library.books (book_id, title, isbn, author, published_year)
 VALUES
@@ -50,6 +16,10 @@ VALUES
     (4, 'Designing Data-Intensive Applications', '978-1449373320', 'Martin Kleppmann', 2017)
 ON DUPLICATE KEY UPDATE title = VALUES(title);
 
+-- ------------------------------------------------------------
+-- 2. Members
+-- ------------------------------------------------------------
+
 INSERT INTO library.members (member_id, name, email, joined_date)
 VALUES
     (1, 'Rahul', 'rahul@example.com', '2026-01-10'),
@@ -57,6 +27,10 @@ VALUES
     (3, 'Amit', 'amit@example.com', '2026-03-20'),
     (4, 'Sneha', 'sneha@example.com', '2026-04-05')
 ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- ------------------------------------------------------------
+-- 3. Loans
+-- ------------------------------------------------------------
 
 INSERT INTO library.loans (loan_id, book_id, member_id, loan_date, due_date, return_date)
 VALUES

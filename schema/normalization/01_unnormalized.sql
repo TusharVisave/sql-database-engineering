@@ -14,6 +14,9 @@
 -- 6. Delete anomalies
 -- ============================================================
 
+CREATE DATABASE IF NOT EXISTS order_management;
+USE order_management;
+
 DROP TABLE IF EXISTS orders_unnormalized;
 
 CREATE TABLE orders_unnormalized (

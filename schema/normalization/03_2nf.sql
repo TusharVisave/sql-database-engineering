@@ -23,6 +23,9 @@
 -- Therefore we separate order-level and product-level data.
 -- ============================================================
 
+CREATE DATABASE IF NOT EXISTS order_management;
+USE order_management;
+
 DROP TABLE IF EXISTS order_items_2nf;
 DROP TABLE IF EXISTS orders_2nf;
 DROP TABLE IF EXISTS products_2nf;

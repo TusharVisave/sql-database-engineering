@@ -10,6 +10,9 @@
 -- At this stage we remove the repeating product groups.
 -- ============================================================
 
+CREATE DATABASE IF NOT EXISTS order_management;
+USE order_management;
+
 DROP TABLE IF EXISTS orders_1nf;
 
 CREATE TABLE orders_1nf (

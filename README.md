@@ -384,12 +384,12 @@ The following sample dataset is used to manually trace and verify the SQL querie
 
 ## Books
 
-| book_id | title                                 | author               | published_year |
-| ------: | ------------------------------------- | -------------------- | -------------: |
-|       1 | Clean Code                            | Robert C. Martin     |           2008 |
-|       2 | Effective Java                        | Joshua Bloch         |           2018 |
-|       3 | Database System Concepts              | Abraham Silberschatz |           2019 |
-|       4 | Designing Data-Intensive Applications | Martin Kleppmann     |           2017 |
+| book_id | title                                 | isbn           | author               | published_year |
+| ------: | ------------------------------------- | -------------- | -------------------- | -------------: |
+|       1 | Clean Code                            | 978-0132350884 | Robert C. Martin     |           2008 |
+|       2 | Effective Java                        | 978-0134685991 | Joshua Bloch         |           2018 |
+|       3 | Database System Concepts              | 978-0078022159 | Abraham Silberschatz |           2019 |
+|       4 | Designing Data-Intensive Applications | 978-1449373320 | Martin Kleppmann     |           2017 |
 
 ---
 
@@ -826,38 +826,55 @@ sql-database-engineering/
 │
 ├── schema.sql
 ├── queries.sql
+├── seeds/
+│   └── library_seed.sql
+│
+├── schema/
+│   ├── normalization/
+│   │   ├── 01_unnormalized.sql
+│   │   ├── 02_1nf.sql
+│   │   ├── 03_2nf.sql
+│   │   ├── 04_3nf.sql
+│   │   └── 05_validation.sql
+│   └── relationships/
+│       ├── 01_categories.sql
+│       ├── 02_product_categories.sql
+│       └── 03_validation.sql
+│
+├── docs/
+│   ├── normalization.md
+│   └── relationships.md
+│
 ├── README.md
 └── .gitignore
 ```
 
 ### `schema.sql`
-
 Contains:
-
-* Database creation
-* Table definitions
-* Primary keys
-* Foreign keys
-* Database constraints
-* Sample data
+* Library database creation (`library`)
+* Table definitions (`books`, `members`, `loans`)
+* Primary keys, foreign keys, and CHECK constraints
+* Sample seed data
 
 ### `queries.sql`
+Contains 5 practical SQL analytical queries on the library database (overdue loans, loan counts, member activity, null filtering).
 
-Contains the practical SQL queries used to analyze the library database.
+### `seeds/`
+Contains standalone SQL seed scripts:
+* `library_seed.sql` — Populates sample books, members, and loans.
+
+### `schema/`
+Contains modular SQL exercises:
+* **`normalization/`**: Demonstrates decomposing an order management schema through UNF → 1NF → 2NF → 3NF along with full integrity validation queries.
+* **`relationships/`**: Demonstrates resolving Many-to-Many relationships via junction tables (`product_categories`), foreign key cascades, and category aggregations.
+
+### `docs/`
+Contains conceptual deep-dives and design documentation:
+* `normalization.md` — Normalization theory, anomaly prevention, and 1NF–3NF progression.
+* `relationships.md` — Cardinality (1:1, 1:N, M:N), junction tables, cascading foreign keys, and join queries.
 
 ### `README.md`
-
-Contains:
-
-* Schema documentation
-* Relationships
-* Design decisions
-* Normalization
-* Sample dataset
-* Manual query walkthroughs
-* Expected outputs
-* SQL concepts
-* Learning roadmap
+Contains comprehensive schema documentation, design decisions, query traces, and learning roadmaps.
 
 ---
 
