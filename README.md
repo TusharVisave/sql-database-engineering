@@ -1,829 +1,506 @@
-# SQL Database Engineering
+# SQL Database Engineering — Enterprise Order Management System
 
-A practical SQL and database engineering repository focused on **relational database design, SQL querying, constraints, normalization, joins, aggregation, and database fundamentals** using MySQL.
-
-The repository is designed to progress from SQL fundamentals toward **advanced database engineering, Java database integration, JPA/Hibernate, query optimization, transactions, and production-oriented database design**.
+A production-oriented database engineering repository presenting the architectural design, relational normalization, indexing mechanics, transactional integrity, and scalability boundaries of an enterprise **Order Management System** implemented in MySQL 8.0.
 
 ---
 
-## 🎯 Objectives
-
-The main objectives of this repository are to:
-
-* Build strong SQL fundamentals.
-* Understand relational database design.
-* Design normalized database schemas.
-* Work with primary keys and foreign keys.
-* Use database constraints correctly.
-* Write practical SQL queries using joins and aggregation.
-* Understand `NULL` handling.
-* Understand one-to-many relationships.
-* Practice SQL using realistic datasets.
-* Build a foundation for JDBC, JPA, and Hibernate.
-* Develop database knowledge useful for backend software engineering.
-
----
-
-# 📚 Current Project — Library Management System
-
-The first project in this repository is a small **Library Management System**.
-
-It models three core entities:
+## 🏗️ Repository Architecture
 
 ```text
-┌──────────────┐
-│    Books     │
-└──────┬───────┘
-       │
-       │ 1
-       │
-       │ N
-┌──────▼───────┐
-│    Loans     │
-└──────▲───────┘
-       │
-       │ N
-       │
-       │ 1
-┌──────┴───────┐
-│   Members    │
-└──────────────┘
-```
-
-### Entities
-
-* **Books** — stores information about books.
-* **Members** — stores information about library members.
-* **Loans** — stores borrowing transactions.
-
-A member can have multiple loans, and a book can appear in multiple loan records over its lifetime.
-
----
-
-# 🗄️ Database Schema
-
-Database:
-
-```text
-library
-```
-
-Tables:
-
-```text
-library
-├── books
-├── members
-└── loans
+SQL Database Engineering
+│
+├── Database design
+├── Normalization
+│   ├── UNF
+│   ├── 1NF
+│   ├── 2NF
+│   └── 3NF
+│
+├── Relationships
+│   ├── 1:N
+│   └── M:N
+│       └── product_categories
+│
+├── Indexing & Query Optimization
+│   ├── B-Tree
+│   ├── EXPLAIN
+│   ├── EXPLAIN ANALYZE
+│   └── Before vs After benchmark
+│
+├── Transactions & ACID
+│   ├── BEGIN
+│   ├── COMMIT
+│   ├── ROLLBACK
+│   └── Isolation
+│
+└── Scalability / What Breaks First
 ```
 
 ---
 
-## 1. Books
+## 🎯 Engineering Objectives
 
-Stores information about books available in the library.
-
-| Column           | Type         | Constraint       | Purpose                |
-| ---------------- | ------------ | ---------------- | ---------------------- |
-| `book_id`        | INTEGER      | PRIMARY KEY      | Unique book identifier |
-| `title`          | VARCHAR(200) | NOT NULL         | Book title             |
-| `isbn`           | VARCHAR(20)  | UNIQUE, NOT NULL | Unique ISBN            |
-| `author`         | VARCHAR(150) | NOT NULL         | Author name            |
-| `published_year` | INTEGER      | —                | Publication year       |
+* **Schema Architecture**: Design production-grade schemas with strict data typing, referential integrity, and defensive integrity constraints (`PRIMARY KEY`, `FOREIGN KEY`, `UNIQUE`, `NOT NULL`, `CHECK`).
+* **Progressive Normalization**: Decompose unnormalized data from UNF through 1NF, 2NF, and 3NF to eliminate insertion, update, and deletion anomalies.
+* **Relationship Modeling**: Implement 1:1, 1:N, and M:N relationships using junction tables with cascade rules and exact data-type matching.
+* **Storage & Indexing Mechanics**: Analyze InnoDB B+Tree internals (16 KB pages, fan-out, clustered vs. secondary indexes, page splits, write penalties).
+* **Hardware Execution Profiling**: Evaluate query performance using `EXPLAIN FORMAT=JSON` and `EXPLAIN ANALYZE` on a 10,000-row dataset.
+* **ACID Transactions**: Guarantee consistency and atomicity using transaction control statements (`START TRANSACTION`, `COMMIT`, `ROLLBACK`) and understand ANSI/ISO isolation levels.
+* **Production Scalability**: Reason about database bottlenecks at scale (buffer pool saturation, row lock contention, write amplification, replication lag, and connection limits).
 
 ---
 
-## 2. Members
+# 🗄️ 1. Database Design
 
-Stores information about library members.
+The core domain modeled across this repository is an **E-Commerce Order Management System** (`order_management`). It captures customer lifecycle, product catalogs, multi-item customer orders, and multi-category taxonomies.
 
-| Column        | Type         | Constraint       | Purpose                  |
-| ------------- | ------------ | ---------------- | ------------------------ |
-| `member_id`   | INTEGER      | PRIMARY KEY      | Unique member identifier |
-| `name`        | VARCHAR(100) | NOT NULL         | Member name              |
-| `email`       | VARCHAR(150) | UNIQUE, NOT NULL | Member email             |
-| `joined_date` | DATE         | NOT NULL         | Membership date          |
-
----
-
-## 3. Loans
-
-Stores borrowing transactions.
-
-| Column        | Type    | Constraint            | Purpose                |
-| ------------- | ------- | --------------------- | ---------------------- |
-| `loan_id`     | INTEGER | PRIMARY KEY           | Unique loan identifier |
-| `book_id`     | INTEGER | FOREIGN KEY, NOT NULL | Borrowed book          |
-| `member_id`   | INTEGER | FOREIGN KEY, NOT NULL | Borrowing member       |
-| `loan_date`   | DATE    | NOT NULL              | Borrowing date         |
-| `due_date`    | DATE    | NOT NULL              | Expected return date   |
-| `return_date` | DATE    | NULL                  | Actual return date     |
-
----
-
-# 🔗 Relationships
-
-### Members → Loans
-
-One member can have many loan records.
+### Entity Relationship Model
 
 ```text
-members.member_id
-        │
-        └──────────► loans.member_id
+┌─────────────────┐
+│  customers_3nf  │
+│ (customer_id PK)│
+└────────┬────────┘
+         │ 1
+         │
+         │ N
+┌────────▼────────┐       1 ┌───────────────────┐ N       ┌────────────────┐
+│   orders_3nf    ├────────►│  order_items_3nf  │◄────────┤  products_3nf  │
+│  (order_id PK)  │         │ (order_id PK/FK,  │         │ (product_id PK)│
+└─────────────────┘         │  product_id PK/FK)│         └───────┬────────┘
+                            └───────────────────┘                 │ 1
+                                                                  │
+                                                                  │ N
+┌──────────────┐          N ┌────────────────────┐                │
+│  categories  │◄───────────┤ product_categories │◄───────────────┘
+│(category_id) │            │ (product_id PK/FK, │
+└──────────────┘            │  category_id PK/FK)│
+                            └────────────────────┘
 ```
-
-### Books → Loans
-
-One book can have many loan records over its lifetime.
-
-```text
-books.book_id
-      │
-      └──────────► loans.book_id
-```
-
-Therefore, `loans` acts as the transaction table connecting **members** and **books**.
 
 ---
 
-# 🔐 Database Constraints
+### Core Relational Schema
 
-The schema uses several important relational database constraints.
-
-## Primary Key
-
-Uniquely identifies each record.
+#### 1. Customers (`customers_3nf`)
+Stores customer accounts with uniqueness guarantees on contact records.
 
 ```sql
-PRIMARY KEY (book_id)
+CREATE TABLE customers_3nf (
+    customer_id   INT AUTO_INCREMENT PRIMARY KEY,
+    customer_name VARCHAR(100) NOT NULL,
+    customer_email VARCHAR(150) NOT NULL UNIQUE,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 ```
 
-Examples:
-
-```text
-book_id
-member_id
-loan_id
-```
-
----
-
-## Foreign Key
-
-Maintains relationships between tables and provides referential integrity.
+#### 2. Products (`products_3nf`)
+Stores purchasable products with domain price validation.
 
 ```sql
-FOREIGN KEY (book_id)
-REFERENCES books(book_id)
+CREATE TABLE products_3nf (
+    product_id    INT AUTO_INCREMENT PRIMARY KEY,
+    product_name  VARCHAR(150) NOT NULL,
+    product_price DECIMAL(10, 2) NOT NULL,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_products_price_positive CHECK (product_price >= 0.00)
+);
 ```
 
-and:
+#### 3. Orders (`orders_3nf`)
+Captures order placement headers linked directly to verified customers.
 
 ```sql
-FOREIGN KEY (member_id)
-REFERENCES members(member_id)
+CREATE TABLE orders_3nf (
+    order_id    INT AUTO_INCREMENT PRIMARY KEY,
+    customer_id INT NOT NULL,
+    order_date  DATE NOT NULL,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_orders_customer
+        FOREIGN KEY (customer_id)
+        REFERENCES customers_3nf(customer_id)
+        ON DELETE RESTRICT
+);
 ```
 
----
-
-## NOT NULL
-
-Ensures that required fields cannot contain `NULL`.
-
-Example:
+#### 4. Order Items (`order_items_3nf`)
+Represents the line items comprising an order. Uses a composite primary key with defensive quantity validation.
 
 ```sql
-title VARCHAR(200) NOT NULL
+CREATE TABLE order_items_3nf (
+    order_id   INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity   INT NOT NULL,
+    PRIMARY KEY (order_id, product_id),
+    CONSTRAINT chk_order_items_quantity_positive CHECK (quantity > 0),
+    CONSTRAINT fk_order_items_order
+        FOREIGN KEY (order_id)
+        REFERENCES orders_3nf(order_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_order_items_product
+        FOREIGN KEY (product_id)
+        REFERENCES products_3nf(product_id)
+        ON DELETE RESTRICT
+);
 ```
 
 ---
 
-## UNIQUE
+### Key Architectural Decisions
 
-Prevents duplicate values.
+1. **Exact Precision for Currency (`DECIMAL(10,2)`)**: Floating point data types (`FLOAT`, `DOUBLE`) introduce binary rounding errors (e.g., $0.1 + 0.2 \neq 0.3$). Financial balances and unit prices must always use fixed-point `DECIMAL`.
+2. **Surrogate Keys vs Composite Keys**: Single-column integer surrogate primary keys (`AUTO_INCREMENT`) provide compact clustered indexes and stable foreign key references, while natural composite keys (`order_id`, `product_id`) enforce exact cardinality in intersection tables.
+3. **Defensive Check Constraints**: Application-level validations can be bypassed by direct database queries, migrations, or batch jobs. Engine-level constraints (`CHECK (quantity > 0)`) ensure data integrity is enforced unconditionally at the storage engine tier.
+4. **Referential Action Policies**:
+   * Line items are tightly bound to the order lifecycle (`ON DELETE CASCADE` on `order_id`).
+   * Customers and products with active historical transaction references cannot be deleted arbitrarily (`ON DELETE RESTRICT`).
 
-Examples:
+---
+
+# 📐 2. Normalization: UNF → 1NF → 2NF → 3NF
+
+Database normalization systematically decomposes tables to eliminate data redundancy and guard against insertion, update, and deletion anomalies.
+
+```text
+Unnormalized (UNF)
+       ↓  (Ensure atomic attributes; eliminate repeating groups)
+      1NF
+       ↓  (Eliminate partial functional dependencies)
+      2NF
+       ↓  (Eliminate transitive functional dependencies)
+      3NF
+```
+
+---
+
+## 2.1 Unnormalized Form (UNF)
+
+In an unnormalized design, multiple attributes or entities are packed into a single row, often using comma-separated lists.
+
+### Schema: `orders_unnormalized`
 
 ```sql
-isbn VARCHAR(20) UNIQUE
+CREATE TABLE orders_unnormalized (
+    order_id       INT,
+    customer_name  VARCHAR(100),
+    customer_email VARCHAR(150),
+    product_ids    VARCHAR(255), -- e.g. '101,102'
+    product_names  VARCHAR(255), -- e.g. 'Keyboard,Mouse'
+    product_prices VARCHAR(255), -- e.g. '49.99,19.99'
+    quantities     VARCHAR(255), -- e.g. '1,2'
+    order_date     DATE
+);
 ```
 
-and:
+```text
+order_id | customer_name | product_ids | product_names  | quantities
+---------+---------------+-------------+----------------+-----------
+1001     | Rahul Sharma  | 101,102     | Keyboard,Mouse | 1,2
+1002     | Priya Patil   | 103         | Monitor        | 1
+```
+
+### Critical Anomalies in UNF:
+1. **Atomicity Violation**: Multiple independent values are conflated within individual columns (`'101,102'`).
+2. **Fragile Search**: Searching for orders containing product `101` requires non-indexable substring patterns (`LIKE '%101%'`), scanning every block in the table.
+3. **Update Anomaly**: If the price or name of "Keyboard" changes, every historical text string in the table must be rewritten. Any missed row creates internal data corruption.
+4. **Insertion Anomaly**: A product cannot exist in the database until a customer places an order for it.
+5. **Deletion Anomaly**: If order `1002` is deleted, all records of the "Monitor" product and its pricing are permanently erased.
+
+---
+
+## 2.2 First Normal Form (1NF)
+
+### 1NF Requirements:
+1. Every column must store **atomic** (indivisible) values.
+2. Repeating groups and delimited arrays must be eliminated.
+3. Each record must be uniquely identifiable via a Primary Key.
+
+### 1NF Schema: `orders_1nf`
+Each product in an order is expanded into its own row, identified by a composite primary key:
 
 ```sql
-email VARCHAR(150) UNIQUE
+CREATE TABLE orders_1nf (
+    order_id       INT NOT NULL,
+    customer_id    INT NOT NULL,
+    customer_name  VARCHAR(100) NOT NULL,
+    customer_email VARCHAR(150) NOT NULL,
+    product_id     INT NOT NULL,
+    product_name   VARCHAR(150) NOT NULL,
+    product_price  DECIMAL(10, 2) NOT NULL,
+    quantity       INT NOT NULL,
+    order_date     DATE NOT NULL,
+    PRIMARY KEY (order_id, product_id)
+);
 ```
-
----
-
-## CHECK
-
-Validates data based on a condition.
-
-The schema ensures that a book cannot have a due date before its loan date:
-
-```sql
-CHECK (due_date >= loan_date)
-```
-
-It also ensures that a return date cannot be earlier than the loan date:
-
-```sql
-CHECK (
-    return_date IS NULL
-    OR return_date >= loan_date
-)
-```
-
----
-
-# 🧠 Design Decisions
-
-## Why separate books and members?
-
-Books and members represent different entities.
-
-Their information is therefore stored in separate tables instead of combining everything into one table.
-
-This reduces duplication and makes the database easier to maintain.
-
----
-
-## Why does `loans` store IDs instead of names?
-
-The `loans` table stores:
 
 ```text
-book_id
-member_id
+order_id | customer_name | product_id | product_name | quantity
+---------+---------------+------------+--------------+---------
+1001     | Rahul Sharma  | 101        | Keyboard     | 1
+1001     | Rahul Sharma  | 102        | Mouse        | 2
+1002     | Priya Patil   | 103        | Monitor      | 1
 ```
 
-instead of:
+### Remaining Flaw: Partial Dependencies
+The primary key is composite: `(order_id, product_id)`. Non-key attributes depend on only a subset of the candidate key:
+* `order_id -> {customer_id, customer_name, customer_email, order_date}`
+* `product_id -> {product_name, product_price}`
+* Only `quantity` depends on the **full** key `(order_id, product_id)`.
+
+Because non-key attributes depend on only part of the primary key, customer and product data are duplicated across every order line item.
+
+---
+
+## 2.3 Second Normal Form (2NF)
+
+### 2NF Requirements:
+1. Must satisfy **1NF**.
+2. Must remove all **partial functional dependencies**: every non-key column must depend on the entire candidate key.
+
+### Decomposition into 2NF:
+We separate the table into three distinct relations:
+
+1. **`products_2nf`**: Keyed by `product_id`
+   ```sql
+   CREATE TABLE products_2nf (
+       product_id    INT PRIMARY KEY,
+       product_name  VARCHAR(150) NOT NULL,
+       product_price DECIMAL(10, 2) NOT NULL
+   );
+   ```
+2. **`orders_2nf`**: Keyed by `order_id`
+   ```sql
+   CREATE TABLE orders_2nf (
+       order_id       INT PRIMARY KEY,
+       customer_id    INT NOT NULL,
+       customer_name  VARCHAR(100) NOT NULL,
+       customer_email VARCHAR(150) NOT NULL,
+       order_date     DATE NOT NULL
+   );
+   ```
+3. **`order_items_2nf`**: Keyed by composite `(order_id, product_id)`
+   ```sql
+   CREATE TABLE order_items_2nf (
+       order_id   INT NOT NULL,
+       product_id INT NOT NULL,
+       quantity   INT NOT NULL,
+       PRIMARY KEY (order_id, product_id),
+       FOREIGN KEY (order_id) REFERENCES orders_2nf(order_id),
+       FOREIGN KEY (product_id) REFERENCES products_2nf(product_id)
+   );
+   ```
+
+### Remaining Flaw: Transitive Dependencies
+In `orders_2nf`:
+* `order_id -> customer_id`
+* `customer_id -> {customer_name, customer_email}`
+* Therefore, `order_id -> customer_name` is a **transitive dependency** ($X \rightarrow Y$ and $Y \rightarrow Z$, where $Y$ is not a candidate key).
+* Customer details cannot be stored until an order is created, and updating a customer's email requires modifying every order placed by that customer.
+
+---
+
+## 2.4 Third Normal Form (3NF)
+
+### 3NF Requirements:
+1. Must satisfy **2NF**.
+2. Must remove all **transitive dependencies**: non-key attributes must depend *only* on candidate keys (*"The key, the whole key, and nothing but the key, so help me Codd"*).
+
+### Final 3NF Schema:
+Extract customer data into its own relation, leaving `orders_3nf` with only a foreign key reference:
 
 ```text
-book_title
-member_name
+┌─────────────────┐       1 : N       ┌─────────────────┐       1 : N       ┌───────────────────┐
+│  customers_3nf  ├──────────────────►│   orders_3nf    ├──────────────────►│  order_items_3nf  │
+│(customer_id PK) │                   │ (order_id PK)   │                   │ (order_id,        │
+└─────────────────┘                   └─────────────────┘                   │  product_id PK)   │
+                                                                            └─────────▲─────────┘
+                                                                                      │ N : 1
+                                                                            ┌─────────┴─────────┐
+                                                                            │   products_3nf    │
+                                                                            │ (product_id PK)   │
+                                                                            └───────────────────┘
 ```
 
-This avoids repeatedly storing the same information.
-
-For example, if a member's name changes, only the `members` table needs to be updated.
-
----
-
-## Why use foreign keys?
-
-Foreign keys:
-
-* Maintain referential integrity.
-* Prevent invalid references.
-* Represent relationships explicitly.
-* Reduce duplicated data.
-* Make joins between related entities possible.
-
-Example:
-
-```text
-loans.member_id → members.member_id
-loans.book_id   → books.book_id
-```
-
----
-
-# 📐 Normalization
-
-The current schema follows basic normalization principles.
-
-## First Normal Form — 1NF
-
-Each column stores atomic values.
-
-For example:
-
-```text
-name  → Rahul
-email → rahul@example.com
-```
-
-A column does not contain multiple independent values.
-
----
-
-## Second Normal Form — 2NF
-
-Attributes depend on the appropriate primary key.
-
-For example:
-
-```text
-book_id → title, isbn, author, published_year
-```
-
-and:
-
-```text
-member_id → name, email, joined_date
-```
-
----
-
-## Third Normal Form — 3NF
-
-Non-key attributes depend on the key rather than on another non-key attribute.
-
-For example, member information belongs in `members` instead of being repeatedly stored in `loans`.
-
----
-
-# 👥 Multiple Authors — Future Improvement
-
-The current schema stores one author directly in the `books` table:
-
-```text
-author
-```
-
-This becomes problematic if a book has multiple authors.
-
-For example:
-
-```text
-Book A → Author A, Author B, Author C
-```
-
-A better design would use:
-
-```text
-books
-authors
-book_authors
-```
-
-The `book_authors` table would act as a bridge table and represent a **many-to-many relationship**.
-
-```text
-Books
-  │
-  │ M:N
-  │
-Book_Authors
-  │
-  │ M:N
-  │
-Authors
-```
-
-This is a planned improvement for the database as the project becomes more advanced.
-
----
-
-# 📊 Sample Dataset
-
-The following sample dataset is used to manually trace and verify the SQL queries.
-
-## Books
-
-| book_id | title                                 | isbn           | author               | published_year |
-| ------: | ------------------------------------- | -------------- | -------------------- | -------------: |
-|       1 | Clean Code                            | 978-0132350884 | Robert C. Martin     |           2008 |
-|       2 | Effective Java                        | 978-0134685991 | Joshua Bloch         |           2018 |
-|       3 | Database System Concepts              | 978-0078022159 | Abraham Silberschatz |           2019 |
-|       4 | Designing Data-Intensive Applications | 978-1449373320 | Martin Kleppmann     |           2017 |
-
----
-
-## Members
-
-| member_id | name  | email                                         | joined_date |
-| --------: | ----- | --------------------------------------------- | ----------- |
-|         1 | Rahul | [rahul@example.com](mailto:rahul@example.com) | 2026-01-10  |
-|         2 | Priya | [priya@example.com](mailto:priya@example.com) | 2026-02-15  |
-|         3 | Amit  | [amit@example.com](mailto:amit@example.com)   | 2026-03-20  |
-|         4 | Sneha | [sneha@example.com](mailto:sneha@example.com) | 2026-04-05  |
-
----
-
-## Loans
-
-| loan_id | book_id | member_id | loan_date  | due_date   | return_date |
-| ------: | ------: | --------: | ---------- | ---------- | ----------- |
-|       1 |       1 |         1 | 2026-08-01 | 2026-08-15 | NULL        |
-|       2 |       2 |         1 | 2026-08-05 | 2026-08-19 | 2026-08-15  |
-|       3 |       3 |         2 | 2026-09-01 | 2026-09-15 | NULL        |
-|       4 |       4 |         2 | 2026-09-05 | 2026-09-19 | NULL        |
-
----
-
-# 🔎 SQL Queries
-
-The repository contains five practical SQL queries.
-
----
-
-## Query 1 — Find Overdue Loans
-
-### Objective
-
-Find loans where:
-
-1. The book has not been returned.
-2. The due date has already passed.
-3. Display the member, book, and due date.
-
-### Query
-
+### Verification Query: Multi-Table 3NF Join
 ```sql
 SELECT
-    m.name AS member_name,
-    b.title AS book_title,
-    l.due_date
-FROM library.loans l
-JOIN library.members m
-    ON l.member_id = m.member_id
-JOIN library.books b
-    ON l.book_id = b.book_id
-WHERE l.return_date IS NULL
-  AND l.due_date < CURRENT_DATE;
+    o.order_id,
+    o.order_date,
+    c.customer_name,
+    c.customer_email,
+    p.product_name,
+    p.product_price,
+    oi.quantity,
+    (p.product_price * oi.quantity) AS line_total
+FROM orders_3nf o
+JOIN customers_3nf c   ON o.customer_id = c.customer_id
+JOIN order_items_3nf oi ON o.order_id = oi.order_id
+JOIN products_3nf p    ON oi.product_id = p.product_id
+ORDER BY o.order_id, p.product_id;
 ```
-
-### Manual Trace
-
-From the sample data:
-
-```text
-Loan 1
-Rahul → Clean Code
-Due: 2026-08-15
-Returned: No
-```
-
-The current date is after `2026-08-15`, and `return_date` is `NULL`.
-
-Therefore, Loan 1 is overdue.
-
-Loan 2 is already returned, so it is excluded.
-
-Loans 3 and 4 have future due dates, so they are not overdue.
-
-### Expected Output
-
-| member_name | book_title | due_date   |
-| ----------- | ---------- | ---------- |
-| Rahul       | Clean Code | 2026-08-15 |
-
-### Concepts Practiced
-
-* `JOIN`
-* Multiple-table joins
-* `WHERE`
-* `IS NULL`
-* Date comparison
-* `CURRENT_DATE`
 
 ---
 
-# Query 2 — Count Loans Per Member
+# 🔗 3. Relationships
 
-### Objective
+Relational database models capture real-world constraints via foreign keys and cardinality mapping.
 
-Find the total number of loans made by each member.
+---
 
-### Query
+## 3.1 One-to-Many (1:N)
 
+One parent record associates with zero, one, or many child records, but each child record maps back to exactly one parent.
+
+* **`customers_3nf` ──► `orders_3nf`**: A customer places many orders; an order belongs to one customer.
+* **`orders_3nf` ──► `order_items_3nf`**: An order contains multiple line items; each line item belongs to one order.
+
+```sql
+ALTER TABLE orders_3nf
+ADD CONSTRAINT fk_orders_customer
+    FOREIGN KEY (customer_id)
+    REFERENCES customers_3nf(customer_id)
+    ON DELETE RESTRICT;
+```
+
+* **Referential Integrity**: Rejecting orphaned records at the storage level. Setting `ON DELETE RESTRICT` protects financial history from accidental customer deletion.
+
+---
+
+## 3.2 Many-to-Many (M:N) via Junction Tables
+
+Direct Many-to-Many relationships cannot be modeled with single foreign keys without violating 1NF or repeating data.
+
+* A **Product** belongs to multiple categories (*e.g., "Wireless Mouse" belongs to "Electronics" and "Accessories"*).
+* A **Category** contains multiple products (*e.g., "Electronics" contains "Keyboard", "Mouse", "Monitor"*).
+
+### Junction Table: `product_categories`
+
+```sql
+CREATE TABLE categories (
+    category_id   INT AUTO_INCREMENT PRIMARY KEY,
+    category_name VARCHAR(100) NOT NULL UNIQUE,
+    description   VARCHAR(255)
+);
+
+CREATE TABLE product_categories (
+    product_id  INT NOT NULL,
+    category_id INT NOT NULL,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (product_id, category_id),
+    CONSTRAINT fk_pc_product
+        FOREIGN KEY (product_id)
+        REFERENCES products_3nf(product_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_pc_category
+        FOREIGN KEY (category_id)
+        REFERENCES categories(category_id)
+        ON DELETE CASCADE
+);
+```
+
+### Exact Data Type Matching Rule:
+In MySQL InnoDB, the foreign key column must have the **exact same data type, signedness, and character set** as the referenced parent primary key column.
+* If `products_3nf.product_id` is `INT`, then `product_categories.product_id` must be `INT` (not `BIGINT` or `SMALLINT`).
+* Type mismatches result in MySQL rejection: `ERROR 3780 (HY000): Referencing column and referenced column are incompatible`.
+
+### Querying M:N Relationships
+
+#### 1. Retrieve Products with All Assigned Categories
 ```sql
 SELECT
-    m.member_id,
-    m.name,
-    COUNT(l.loan_id) AS total_loans
-FROM library.members m
-LEFT JOIN library.loans l
-    ON m.member_id = l.member_id
-GROUP BY m.member_id, m.name;
+    p.product_id,
+    p.product_name,
+    c.category_name
+FROM products_3nf p
+JOIN product_categories pc ON p.product_id = pc.product_id
+JOIN categories c         ON pc.category_id = c.category_id
+ORDER BY p.product_id;
 ```
 
-### Manual Trace
-
-From the sample data:
-
-```text
-Rahul → Loan 1, Loan 2 → 2 loans
-Priya → Loan 3, Loan 4 → 2 loans
-Amit  → No loans       → 0 loans
-Sneha → No loans       → 0 loans
-```
-
-Because `LEFT JOIN` is used, Amit and Sneha remain in the result even though they have no matching loans.
-
-### Expected Output
-
-| member_id | name  | total_loans |
-| --------: | ----- | ----------: |
-|         1 | Rahul |           2 |
-|         2 | Priya |           2 |
-|         3 | Amit  |           0 |
-|         4 | Sneha |           0 |
-
-### Concepts Practiced
-
-* `LEFT JOIN`
-* `GROUP BY`
-* `COUNT()`
-* Aggregation
-
----
-
-# Query 3 — Find Members With No Loans
-
-### Objective
-
-Find members who have never borrowed a book.
-
-### Query
-
+#### 2. Category Aggregation (Product Count per Category)
 ```sql
 SELECT
-    m.member_id,
-    m.name,
-    m.email
-FROM library.members m
-LEFT JOIN library.loans l
-    ON m.member_id = l.member_id
-WHERE l.loan_id IS NULL;
+    c.category_id,
+    c.category_name,
+    COUNT(pc.product_id) AS product_count
+FROM categories c
+LEFT JOIN product_categories pc ON c.category_id = pc.category_id
+GROUP BY c.category_id, c.category_name
+ORDER BY product_count DESC;
 ```
 
-### Manual Trace
+---
 
-Start with all members:
+# ⚡ 4. Indexing & Query Optimization
+
+A deep dive into B+Tree mechanics, query execution plans (`EXPLAIN` / `EXPLAIN ANALYZE`), storage/write trade-offs, and empirical benchmarking on a 10,000-row dataset.
+
+For the full theoretical breakdown, see [docs/indexing.md](file:///c:/Users/Commit/Desktop/sql-database-engineering/docs/indexing.md).
+
+---
+
+## 4.1 B-Tree Internal Mechanics
+
+MySQL InnoDB structures tables and secondary indexes as **B+Trees** optimized for page-based storage I/O.
 
 ```text
-Rahul
-Priya
-Amit
-Sneha
+                           ┌────────────────────────┐
+                           │   Root Page (Node)     │
+                           │  [email < M] | [email >= M]│
+                           └────────┬───────────────┘
+                                    │
+            ┌───────────────────────┴───────────────────────┐
+            ▼                                               ▼
+┌───────────────────────┐                       ┌───────────────────────┐
+│ Intermediate Page 1   │                       │ Intermediate Page 2   │
+│ [email < F] | [>= F]  │                       │ [email < S] | [>= S]  │
+└───────┬───────┬───────┘                       └───────┬───────┬───────┘
+        │       │                                       │       │
+    ┌───┘       └───┐                               ┌───┘       └───┐
+    ▼               ▼                               ▼               ▼
+┌──────────────┐ ┌──────────────┐               ┌──────────────┐ ┌──────────────┐
+│ Leaf Page 1  │◄┤ Leaf Page 2  │◄─────────────►│ Leaf Page 3  │◄┤ Leaf Page 4  │
+│ [Keys + Ptrs]│ │ [Keys + Ptrs]│               │ [Keys + Ptrs]│ │ [Keys + Ptrs]│
+└──────────────┘ └──────────────┘               └──────────────┘ └──────────────┘
+ └─── Doubly Linked List for Range Scans (BETWEEN, >, <, ORDER BY) ─────────────┘
 ```
 
-Match their loans:
-
-```text
-Rahul → Loan 1, Loan 2
-Priya → Loan 3, Loan 4
-Amit  → NULL
-Sneha → NULL
-```
-
-The condition:
-
-```sql
-WHERE l.loan_id IS NULL
-```
-
-keeps only:
-
-```text
-Amit
-Sneha
-```
-
-### Expected Output
-
-| member_id | name  | email                                         |
-| --------: | ----- | --------------------------------------------- |
-|         3 | Amit  | [amit@example.com](mailto:amit@example.com)   |
-|         4 | Sneha | [sneha@example.com](mailto:sneha@example.com) |
-
-### Important Pattern
-
-```sql
-LEFT JOIN
-WHERE right_table.id IS NULL
-```
-
-This is a common SQL pattern for finding records with **no matching record**.
-
-### Concepts Practiced
-
-* `LEFT JOIN`
-* `NULL`
-* Anti-join pattern
+* **16 KB Page Unit**: Storage allocation and memory caching in the `innodb_buffer_pool` happen in 16 KB pages.
+* **High Fan-Out**: Intermediate index pages store only search keys and 8-byte child page pointers. A single 16 KB page holds $>1,000$ pointers.
+  * A 3-level B+Tree holds up to $1,000 \times 1,000 \times 1,000 = 1,000,000,000$ leaf rows.
+  * Any row in a billion-row table can be reached in **3 to 4 logical disk page lookups ($O(\log_B N)$)**.
+* **Clustered vs Secondary Index**:
+  * **Clustered Index**: Automatically built on the Primary Key. Leaf nodes store the **entire row data**.
+  * **Secondary Index**: Leaf nodes store the secondary key plus the corresponding Primary Key value. Finding non-indexed columns requires a secondary **Bookmark Lookup** in the clustered tree.
+* **Covering Index Optimization**: When all columns requested by a `SELECT` exist directly in the secondary index leaf page, InnoDB bypasses the clustered index bookmark lookup entirely (`Extra: Using index`).
 
 ---
 
-# Query 4 — List Currently Borrowed Books
+## 4.2 The Cost of Indexing: Why "Index Everything" Fails
 
-### Objective
-
-Find all books that are currently borrowed and have not yet been returned.
-
-### Query
-
-```sql
-SELECT
-    b.title AS book_title,
-    m.name AS member_name,
-    l.loan_date,
-    l.due_date
-FROM library.loans l
-JOIN library.books b
-    ON l.book_id = b.book_id
-JOIN library.members m
-    ON l.member_id = m.member_id
-WHERE l.return_date IS NULL;
-```
-
-### Manual Trace
-
-Check the `return_date` column:
-
-```text
-Loan 1 → NULL
-Loan 2 → 2026-08-15
-Loan 3 → NULL
-Loan 4 → NULL
-```
-
-Therefore, Loans 1, 3, and 4 represent currently borrowed books.
-
-### Expected Output
-
-| book_title                            | member_name | loan_date  | due_date   |
-| ------------------------------------- | ----------- | ---------- | ---------- |
-| Clean Code                            | Rahul       | 2026-08-01 | 2026-08-15 |
-| Database System Concepts              | Priya       | 2026-09-01 | 2026-09-15 |
-| Designing Data-Intensive Applications | Priya       | 2026-09-05 | 2026-09-19 |
-
-### Concepts Practiced
-
-* Multiple `JOIN`s
-* `WHERE`
-* `IS NULL`
-* Relational data retrieval
+While indexes accelerate reads, they introduce operational costs:
+1. **Write Amplification on INSERT/UPDATE/DELETE**: Every insert must update the clustered index **plus every secondary B-tree**. A table with 5 indexes executes 6 tree writes per row.
+2. **Page Splits**: When inserting into a full 16 KB leaf page, InnoDB must allocate a new page, migrate 50% of the keys, rewrite sibling pointers, and insert parent pointers. This triggers intensive Redo/Undo log I/O and locks tree pages.
+3. **Buffer Pool Thrashing**: Secondary index pages compete with active data pages in RAM (`innodb_buffer_pool`), evicting hot rows to disk.
 
 ---
 
-# Query 5 — Count Loans Per Book
+## 4.3 Composite Indexes & The Leftmost Prefix Rule
 
-### Objective
-
-Find how many times each book has been borrowed.
-
-### Query
-
-```sql
-SELECT
-    b.book_id,
-    b.title,
-    COUNT(l.loan_id) AS loan_count
-FROM library.books b
-LEFT JOIN library.loans l
-    ON b.book_id = l.book_id
-GROUP BY b.book_id, b.title
-ORDER BY loan_count DESC;
-```
-
-### Manual Trace
-
-From the sample data:
-
-```text
-Clean Code                              → 1 loan
-Effective Java                          → 1 loan
-Database System Concepts                → 1 loan
-Designing Data-Intensive Applications   → 1 loan
-```
-
-Every book currently has exactly one loan record.
-
-### Expected Output
-
-| book_id | title                                 | loan_count |
-| ------: | ------------------------------------- | ---------: |
-|       1 | Clean Code                            |          1 |
-|       2 | Effective Java                        |          1 |
-|       3 | Database System Concepts              |          1 |
-|       4 | Designing Data-Intensive Applications |          1 |
-
-### Concepts Practiced
-
-* `LEFT JOIN`
-* `GROUP BY`
-* `COUNT()`
-* `ORDER BY`
-* Aggregation
+A composite index on `(col_a, col_b)` stores a single B+tree ordered first by `col_a`, then secondarily by `col_b`.
+* `WHERE col_a = ?` ✅ Uses index.
+* `WHERE col_a = ? AND col_b = ?` ✅ Uses index fully.
+* `WHERE col_a = ? ORDER BY col_b` ✅ Avoids filesort.
+* `WHERE col_b = ?` ❌ **Cannot use index** (violates Leftmost Prefix Rule).
 
 ---
 
-# 🧩 SQL Concepts Practiced
+## 4.4 Empirical Benchmark: Before vs. After Indexing
 
-| Concept        | Purpose                          |
-| -------------- | -------------------------------- |
-| `SELECT`       | Retrieve data                    |
-| `WHERE`        | Filter rows                      |
-| `INNER JOIN`   | Match related records            |
-| `LEFT JOIN`    | Preserve records without matches |
-| `GROUP BY`     | Group records for aggregation    |
-| `COUNT()`      | Count records                    |
-| `ORDER BY`     | Sort results                     |
-| `IS NULL`      | Check missing values             |
-| `CURRENT_DATE` | Work with the current date       |
-| Primary Key    | Uniquely identify records        |
-| Foreign Key    | Create relationships             |
-| `NOT NULL`     | Require a value                  |
-| `UNIQUE`       | Prevent duplicate values         |
-| `CHECK`        | Validate data                    |
-
----
-
-# 🔑 Important SQL Patterns
-
-## INNER JOIN
-
-Use when only matching records are required.
-
-```sql
-SELECT *
-FROM loans l
-JOIN books b
-    ON l.book_id = b.book_id;
-```
-
----
-
-## LEFT JOIN
-
-Use when all records from the left table must be retained.
-
-```sql
-SELECT *
-FROM members m
-LEFT JOIN loans l
-    ON m.member_id = l.member_id;
-```
-
----
-
-## Find Records With No Match
-
-A common pattern:
-
-```sql
-SELECT *
-FROM members m
-LEFT JOIN loans l
-    ON m.member_id = l.member_id
-WHERE l.loan_id IS NULL;
-```
-
----
-
-## Aggregation
-
-Use `GROUP BY` with aggregate functions such as `COUNT()`.
-
-```sql
-SELECT
-    member_id,
-    COUNT(loan_id)
-FROM loans
-GROUP BY member_id;
-```
-
----
-
-## NULL Handling
-
-Correct:
-
-```sql
-WHERE return_date IS NULL;
-```
-
-Incorrect:
-
-```sql
-WHERE return_date = NULL;
-```
-
-`NULL` represents missing or unknown data and must be checked using `IS NULL` or `IS NOT NULL`.
-
----
-
-
----
-
-# ⚡ Day 3 — Indexing & Query Optimization
-
-A deep dive into **B-Tree indexing mechanics, query execution plans (`EXPLAIN` and `EXPLAIN ANALYZE`), storage/write trade-offs, and composite indexes** using a 10,000-row `orders` dataset.
-
-For the full theoretical and internal architectural breakdown, see [docs/indexing.md](file:///c:/Users/Commit/Desktop/sql-database-engineering/docs/indexing.md).
-
----
-
-## 🔬 Benchmark Setup
-
+### Benchmark Configuration
 * **Database**: `order_management`
 * **Table**: `orders` ([schema/indexing/01_orders_table.sql](file:///c:/Users/Commit/Desktop/sql-database-engineering/schema/indexing/01_orders_table.sql))
-* **Dataset Size**: **10,000 rows** generated via [seeds/generate_orders_seed.py](file:///c:/Users/Commit/Desktop/sql-database-engineering/seeds/generate_orders_seed.py) (stored in [seeds/orders_seed.sql](file:///c:/Users/Commit/Desktop/sql-database-engineering/seeds/orders_seed.sql))
+* **Dataset Volume**: **10,000 rows** generated via [seeds/generate_orders_seed.py](file:///c:/Users/Commit/Desktop/sql-database-engineering/seeds/generate_orders_seed.py)
 * **Target Query**:
   ```sql
   SELECT *
@@ -834,7 +511,18 @@ For the full theoretical and internal architectural breakdown, see [docs/indexin
 
 ---
 
-## 📊 Before vs. After Performance Comparison
+### 📊 Performance Comparison
+
+| Metric | Before | After |
+| :--- | :--- | :--- |
+| Rows examined | 10,000 | 5 |
+| Access | Full table scan | B-Tree lookup |
+| Optimizer cost | 1025.75 | 1.75 |
+| Execution time | 7.82 ms | 0.08 ms |
+
+---
+
+### Detailed Benchmark Metrics Breakdown
 
 | Metric | Without Index (Baseline) | With B-Tree Index (`idx_orders_customer_email`) | Performance Gain |
 | :--- | :--- | :--- | :--- |
@@ -849,13 +537,13 @@ For the full theoretical and internal architectural breakdown, see [docs/indexin
 
 ---
 
-## 🔍 Query Plan Evidence (Raw Outputs)
+### Raw Query Plan Evidence
 
-### 1. BEFORE Indexing (Full Table Scan)
+#### 1. BEFORE Indexing (Full Table Scan)
 
-Without a secondary index on `customer_email`, the storage engine must load and scan all 10,000 rows sequentially across every data page in InnoDB.
+Without a secondary index, the engine scans all 10,000 rows across every InnoDB data page.
 
-#### Standard EXPLAIN (Tabular)
+##### Tabular EXPLAIN:
 ```text
 +----+-------------+--------+------------+------+---------------+------+---------+------+-------+----------+-------------+
 | id | select_type | table  | partitions | type | possible_keys | key  | key_len | ref  | rows  | filtered | Extra       |
@@ -864,7 +552,7 @@ Without a secondary index on `customer_email`, the storage engine must load and 
 +----+-------------+--------+------------+------+---------------+------+---------+------+-------+----------+-------------+
 ```
 
-#### EXPLAIN FORMAT=JSON
+##### EXPLAIN FORMAT=JSON:
 ```json
 {
   "query_block": {
@@ -884,23 +572,13 @@ Without a secondary index on `customer_email`, the storage engine must load and 
         "prefix_cost": "1025.75",
         "data_read_per_join": "1M"
       },
-      "used_columns": [
-        "order_id",
-        "customer_id",
-        "customer_name",
-        "customer_email",
-        "order_amount",
-        "order_status",
-        "order_date",
-        "created_at"
-      ],
       "attached_condition": "(`order_management`.`orders`.`customer_email` = 'sophia.miller@example.com')"
     }
   }
 }
 ```
 
-#### EXPLAIN ANALYZE (Hardware Execution Profile)
+##### EXPLAIN ANALYZE (Hardware Execution Profile):
 ```text
 -> Filter: (orders.customer_email = 'sophia.miller@example.com')  (cost=1025.75 rows=1000) (actual time=0.184..7.818 rows=5 loops=1)
     -> Table scan on orders  (cost=1025.75 rows=10000) (actual time=0.042..6.950 rows=10000 loops=1)
@@ -908,21 +586,19 @@ Without a secondary index on `customer_email`, the storage engine must load and 
 
 ---
 
-### 2. Adding the Index
+#### 2. Index Creation
 
 ```sql
 CREATE INDEX idx_orders_customer_email ON orders (customer_email);
 ```
 
-This constructs a secondary B+Tree where each leaf page stores the sorted `customer_email` keys paired with their corresponding clustered index primary key (`order_id`).
-
 ---
 
-### 3. AFTER Indexing (Index Ref Lookup)
+#### 3. AFTER Indexing (Index Ref Lookup)
 
-With the B-Tree in place, MySQL performs a root-to-leaf binary search to pinpoint the 5 matching entries, fetching each row via a clustered index bookmark lookup.
+Root-to-leaf binary traversal pinpoints the exact 5 leaf entries and performs clustered bookmark lookups.
 
-#### Standard EXPLAIN (Tabular)
+##### Tabular EXPLAIN:
 ```text
 +----+-------------+--------+------------+------+---------------------------+---------------------------+---------+-------+------+----------+-------+
 | id | select_type | table  | partitions | type | possible_keys             | key                       | key_len | ref   | rows | filtered | Extra |
@@ -931,7 +607,7 @@ With the B-Tree in place, MySQL performs a root-to-leaf binary search to pinpoin
 +----+-------------+--------+------------+------+---------------------------+---------------------------+---------+-------+------+----------+-------+
 ```
 
-#### EXPLAIN FORMAT=JSON
+##### EXPLAIN FORMAT=JSON:
 ```json
 {
   "query_block": {
@@ -961,51 +637,250 @@ With the B-Tree in place, MySQL performs a root-to-leaf binary search to pinpoin
         "eval_cost": "0.50",
         "prefix_cost": "1.75",
         "data_read_per_join": "5K"
-      },
-      "used_columns": [
-        "order_id",
-        "customer_id",
-        "customer_name",
-        "customer_email",
-        "order_amount",
-        "order_status",
-        "order_date",
-        "created_at"
-      ]
+      }
     }
   }
 }
 ```
 
-#### EXPLAIN ANALYZE (Hardware Execution Profile)
+##### EXPLAIN ANALYZE (Hardware Execution Profile):
 ```text
 -> Index lookup on orders using idx_orders_customer_email (customer_email='sophia.miller@example.com')  (cost=1.75 rows=5) (actual time=0.038..0.082 rows=5 loops=1)
 ```
 
 ---
 
-## 💡 Engineering Takeaways
+# 🔄 5. Transactions & ACID
 
-### 1. Why "Index Everything" is Wrong: The Cost of Indexing
-* **Write Penalty**: For every `INSERT`, MySQL must insert the record into the primary clustered index **plus every secondary B-Tree**. A table with 6 indexes requires 7 distinct tree modifications per insert.
-* **Page Splits**: When an insert hits a full 16 KB leaf page, InnoDB must allocate a new page, migrate ~50% of the keys, update sibling doubly-linked pointers, and insert parent pointers. This generates heavy Redo/Undo logging and stalls concurrency.
-* **Memory & Storage**: Secondary indexes consume significant disk space and compete for space in the `innodb_buffer_pool`. Excess index pages evict active table data pages, causing cache thrashing.
+A transaction is a single logical unit of database work. In Order Management, placing an order requires inserting the order header and all line items atomically.
 
-### 2. Composite Index vs. Two Separate Indexes
-* **Composite Index `(customer_email, order_date)`**: Single B-tree sorted first by `customer_email`, then by `order_date`. Best when queries filter on both columns (`WHERE customer_email = ? AND order_date >= ?`). Follows the **Leftmost Prefix Rule** (can also satisfy queries filtering on `customer_email` alone).
-* **Two Separate Indexes**: Necessary when queries frequently filter on `customer_email` independently **and** on `order_date` independently. When queried together, MySQL must pick one index or perform an expensive **Index Merge** (`Using intersect`).
+For the full conceptual guide, see [docs/transactions.md](file:///c:/Users/Commit/Desktop/sql-database-engineering/docs/transactions.md).
 
 ---
 
-# 🛠️ Tools & Technologies
+## 5.1 ACID Guarantees in Order Management
 
-* **MySQL 8.0**
-* **MySQL Workbench**
-* **SQL**
-* **Git**
-* **GitHub**
-* **IntelliJ IDEA**
-* **Python 3** (Data generation scripts)
+* **Atomicity**: The entire order payload (`orders_3nf` header + all `order_items_3nf` items) commits together. If inserting any item fails, the transaction is completely rolled back; no half-created orders can exist.
+* **Consistency**: Transactions transition the database from one valid state to another, enforcing primary keys, foreign keys, and check constraints (`quantity > 0`).
+* **Isolation**: Concurrent transactions cannot observe uncommitted intermediate states of other sessions.
+* **Durability**: Once a transaction is committed, changes survive power outages, server crashes, or OS reboots via the InnoDB Write-Ahead Redo Log (`ib_logfile`).
+
+---
+
+## 5.2 Transaction Control: BEGIN, COMMIT, ROLLBACK
+
+### 1. Atomic Order Commit (`01_commit_order.sql`)
+```sql
+USE order_management;
+
+START TRANSACTION;
+
+-- 1. Create order header
+INSERT INTO orders_3nf (order_id, customer_id, order_date)
+VALUES (9001, 1, CURRENT_DATE);
+
+-- 2. Add line items
+INSERT INTO order_items_3nf (order_id, product_id, quantity)
+VALUES
+    (9001, 101, 2),
+    (9001, 102, 1);
+
+-- 3. Persist atomically
+COMMIT;
+```
+
+---
+
+### 2. Transaction Rollback on Failure (`02_rollback_order.sql`)
+When a constraint fails (e.g. invalid `product_id`), the transaction must be explicitly rolled back to prevent partial writes.
+
+```sql
+USE order_management;
+
+START TRANSACTION;
+
+-- 1. Create order header
+INSERT INTO orders_3nf (order_id, customer_id, order_date)
+VALUES (9002, 1, CURRENT_DATE);
+
+-- 2. Add valid line item
+INSERT INTO order_items_3nf (order_id, product_id, quantity)
+VALUES (9002, 101, 2);
+
+-- 3. Attempt invalid product insertion (Fails: Foreign Key Violation)
+INSERT INTO order_items_3nf (order_id, product_id, quantity)
+VALUES (9002, 999999, 1);
+
+-- 4. Discard all operations
+ROLLBACK;
+```
+
+> **Engineering Rule**: In MySQL/InnoDB, a single failed SQL statement does **NOT** automatically roll back the entire transaction. The application layer must handle the error and explicitly execute `ROLLBACK`.
+
+---
+
+## 5.3 Concurrency & Isolation Levels
+
+ANSI/ISO SQL defines four isolation levels to manage concurrent read phenomena:
+
+| Isolation Level | Dirty Read | Non-Repeatable Read | Phantom Read |
+| :--- | :--- | :--- | :--- |
+| **READ UNCOMMITTED** | Possible | Possible | Possible |
+| **READ COMMITTED** | Prevented | Possible | Possible |
+| **REPEATABLE READ** (MySQL Default) | Prevented | Prevented | Prevented (via MVCC & Next-Key Locks) |
+| **SERIALIZABLE** | Prevented | Prevented | Prevented |
+
+### Concurrency Anomalies Explained:
+* **Dirty Read**: Transaction B reads uncommitted data written by Transaction A. If Transaction A rolls back, Transaction B acted on phantom data.
+* **Non-Repeatable Read**: Transaction A reads a row twice, but Transaction B commits an update between the reads, returning different column values.
+* **Phantom Read**: Transaction A executes a range query twice (`WHERE order_date = ?`), but Transaction B commits an insert matching that range, causing new rows to appear in the second read.
+
+### Managing Isolation in MySQL:
+```sql
+-- Check current isolation level
+SELECT @@transaction_isolation;
+
+-- Set session isolation level
+SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+```
+
+---
+
+# 💥 6. Scalability / What Breaks First
+
+When an Order Management System scales from **10,000 rows** to **100,000 rows (10x)**, **1,000,000+ rows (100x)**, and beyond under high concurrency, monolithic relational databases encounter hard architectural limits.
+
+---
+
+## 6.1 What Happens to This Schema at 10x and 100x Data Volume?
+
+| Data Volume | Orders Table Size | Order Items (~3x) | B+Tree Depth | Buffer Pool Impact | Query Behavior & Bottlenecks |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Baseline (10K)** | ~1.5 MB | ~3.8 MB (30K rows) | 2 levels | 100% in RAM | Indexed queries complete in **0.08 ms**. Unindexed full table scans take **7.82 ms**. |
+| **10x Volume (100K)** | ~15 MB | ~38 MB (300K rows) | 3 levels | Fits in RAM | Single-key lookups remain fast (~0.12 ms) due to 1 extra B-tree hop. However, **unindexed scans jump from 7.8 ms to ~75–100 ms**, causing CPU spikes and blocking concurrent transactions. |
+| **100x Volume (1M+)** | ~160 MB | ~400 MB (3M+ rows) | 3–4 levels | Working set exceeds cache | Random I/O begins dominating. A full table scan requires reading ~10,000 disk pages (~160 MB), taking **1.5 to 4.0 seconds** per query. Joins across `orders` and `order_items` without exact composite indexes trigger disk-based temporary tables and hash joins. |
+
+### The 10x Turning Point:
+At 100,000 rows, a missing index ceases to be a mere performance inefficiency; it becomes a **system-halting incident**. An accidental full table scan holding a shared lock (`LOCK IN SHARE MODE`) or updating rows without an index (`UPDATE orders SET status = 'PROCESSED' WHERE ...`) locks entire tables via next-key locks, cascading into thread pool starvation.
+
+---
+
+## 6.2 Where Would You Shard? (Horizontal Partitioning Strategy)
+
+When dataset volume and write throughput exceed the limits of vertical hardware scaling (typically >50M rows or >5,000 write ops/sec), the database must be horizontally sharded.
+
+```text
+                               ┌───────────────────────────┐
+                               │   Application / ProxySQL  │
+                               └─────────────┬─────────────┘
+                                             │
+                      Shard Key: hash(customer_id) % 3
+                                             │
+             ┌───────────────────────────────┼───────────────────────────────┐
+             ▼                               ▼                               ▼
+    ┌─────────────────┐             ┌─────────────────┐             ┌─────────────────┐
+    │     Shard 1     │             │     Shard 2     │             │     Shard 3     │
+    │ (customer_id    │             │ (customer_id    │             │ (customer_id    │
+    │  MOD 3 = 0)     │             │  MOD 3 = 1)     │             │  MOD 3 = 2)     │
+    ├─────────────────┤             ├─────────────────┤             ├─────────────────┤
+    │ customers_3nf   │             │ customers_3nf   │             │ customers_3nf   │
+    │ orders_3nf      │             │ orders_3nf      │             │ orders_3nf      │
+    │ order_items_3nf │             │ order_items_3nf │             │ order_items_3nf │
+    └─────────────────┘             └─────────────────┘             └─────────────────┘
+             ▲                               ▲                               ▲
+             └───────────────────────┬───────┴───────────────────────────────┘
+                                     │ Broadcast Replicas
+                            ┌────────┴────────┐
+                            │  Global Tables  │
+                            │  (products_3nf, │
+                            │   categories)   │
+                            └─────────────────┘
+```
+
+### 1. Selected Shard Key: `customer_id`
+* **Why `customer_id`?**:
+  * An e-commerce platform's transactional operations are overwhelmingly customer-centric (*"View my order history"*, *"Checkout active cart"*, *"View my past orders"*).
+  * Sharding by `customer_id` co-locates `customers_3nf`, `orders_3nf`, and `order_items_3nf` for any single customer onto the **exact same physical database shard**.
+  * **Critical Benefit**: Order creation (`orders_3nf` + `order_items_3nf`) executes as a **local single-shard transaction**, maintaining full ACID guarantees without expensive two-phase commit (2PC) or distributed transaction coordinators.
+
+### 2. What Breaks When Sharding by `customer_id`?
+* **Global Queries & Cross-Shard Joins**: Queries that search across customers (e.g., *"Find all orders containing product 101 placed today"*) cannot be routed to a single shard. The application or proxy must execute a **Scatter-Gather** query across all $N$ shards and merge the results in memory.
+* **Hot Shards / Key Skew**: High-volume corporate or reseller accounts placing 10,000x more orders than average users create unbalanced "hot shards". Remediation requires composite sharding or salt prefixes for institutional accounts.
+
+### 3. Handling Catalog Tables: Global Broadcast
+* Tables like `products_3nf`, `categories`, and `product_categories` cannot be sharded by `customer_id`.
+* **Solution**: Replicate catalog tables to every shard as **read-only broadcast tables**, or serve them exclusively from an independent catalog cluster / distributed cache.
+
+---
+
+## 6.3 What Would You Cache? (Caching Architecture)
+
+In an enterprise Order Management System, 90%+ of traffic consists of read queries. Placing an in-memory cache (**Redis Cluster**) in front of MySQL shields the storage engine from redundant reads.
+
+```text
+[ Client ] ──► [ API Gateway ] ──► [ Cache Layer (Redis) ]
+                                          │
+                                     (Cache Miss)
+                                          │
+                                          ▼
+                             [ Primary Database (MySQL) ]
+```
+
+### 1. What to Cache (Aggressive Caching)
+* **Product Catalog (`products_3nf`)**:
+  * **Read-to-Write Ratio**: $>1000 : 1$.
+  * **Cache Pattern**: Cache-Aside (Lazy Loading) with key `product:{product_id}` storing JSON or Redis Hashes.
+  * **TTL**: 1 hour with event-driven cache invalidation on catalog updates.
+* **Category Taxonomies (`categories`, `product_categories`)**:
+  * Highly static hierarchical data. Cache full category trees with long TTL (24h).
+* **Hot Product Inventory**:
+  * To avoid locking the `products_3nf` table during flash sales, store available stock counts in Redis as an atomic integer. Decrement stock using atomic Redis Lua scripts (`INCRBY -quantity`) before issuing database transaction requests.
+
+### 2. What NOT to Cache
+* **Active Checkout Transactions**: Inserting into `orders_3nf` and `order_items_3nf` must go directly to the primary database to enforce ACID durability.
+* **High-Cardinality One-Off Filter Queries**: Caching ad-hoc customer filter permutations pollutes cache memory with near-zero hit rates.
+
+---
+
+## 6.4 Core Failure Points Under High Throughput
+
+### 1. InnoDB Buffer Pool Saturation & Disk Thrashing
+* **The Failure**: When total active data pages and secondary index trees exceed `innodb_buffer_pool_size`, every read query must fetch pages synchronously from NVMe/SSD storage.
+* **Symptom**: Read latencies spike from 0.08 ms to 15–30 ms; `innodb_buffer_pool_read_requests` drops as `innodb_data_reads` surges.
+* **Remediation**: Size buffer pool to 70–80% of system RAM; implement covering indexes (`Using index`) to avoid fetching clustered table pages.
+
+### 2. Row Lock Contention on Hot Inventory Rows
+* **The Failure**: 500 concurrent checkouts attempting to decrement inventory for the same hot product (`UPDATE products_3nf SET stock = stock - 1 WHERE product_id = 101`) serialize behind exclusive row locks (X-locks).
+* **Symptom**: `Lock wait timeout exceeded (1205)`; database connection pool fills up in milliseconds.
+* **Remediation**: Use optimistic locking (`UPDATE ... WHERE product_id = ? AND version = ?`), or offload inventory reservation to Redis atomic counters and Kafka message queues.
+
+### 3. Write Amplification & Page Splits
+* **The Failure**: High-speed batch inserts force simultaneous modifications across every secondary index. When 16 KB B-tree leaf pages fill up, InnoDB halts writes to allocate new pages and balance sibling pointers.
+* **Symptom**: Heavy Redo log generation (`ib_logfile`), checkpoint stalls, write latency spikes.
+* **Remediation**: Eliminate unused secondary indexes; use monotonically increasing sequential IDs (`AUTO_INCREMENT`) instead of random UUIDv4.
+
+### 4. Connection Pool Starvation (`max_connections`)
+* **The Failure**: Long-running or unindexed queries hold worker threads open, exhausting MySQL's `max_connections` (default 151).
+* **Symptom**: `ERROR 1040 (08004): Too many connections`. Whole-system downtime across all connecting microservices.
+* **Remediation**: Deploy **ProxySQL** or **MaxScale** connection pool multiplexers; tune HikariCP pool sizes ($\text{pool} = \text{cores} \times 2 + \text{disk spindles}$).
+
+### 5. Deep Pagination Offset Degradation
+* **The Failure**: `SELECT * FROM orders_3nf ORDER BY order_id LIMIT 1000000, 20` scans 1,000,020 rows, discarding the first million.
+* **Symptom**: Query times scale linearly with page depth ($O(N)$).
+* **Remediation**: Replace offset pagination with **Keyset (Cursor-based) pagination**:
+  ```sql
+  SELECT *
+  FROM orders_3nf
+  WHERE order_id > :last_seen_order_id
+  ORDER BY order_id ASC
+  LIMIT 20;
+  ```
+
+### 6. Replication Lag in Read-Write Splits
+* **The Failure**: Read replicas fall behind primary when large write batches or complex DDL commands are replayed sequentially by replica SQL threads.
+* **Symptom**: "Read-your-own-writes" inconsistency: customer places an order, redirects to order history, and sees an empty list.
+* **Remediation**: Route critical post-write reads to the Primary; enable multi-threaded applier threads (`replica_parallel_workers = 8`); use GTID with session consistency tokens.
 
 ---
 
@@ -1014,189 +889,99 @@ With the B-Tree in place, MySQL performs a root-to-leaf binary search to pinpoin
 ```text
 sql-database-engineering/
 │
-├── schema.sql
-├── queries.sql
-├── seeds/
-│   ├── library_seed.sql
-│   ├── generate_orders_seed.py
-│   └── orders_seed.sql
+├── README.md                          # Master architectural presentation
+├── schema.sql                         # Legacy library baseline schema
+├── queries.sql                        # Legacy analytical SQL queries
 │
 ├── schema/
-│   ├── indexing/
-│   │   ├── 01_orders_table.sql
-│   │   └── 02_indexing_benchmarks.sql
-│   ├── normalization/
-│   │   ├── 01_unnormalized.sql
-│   │   ├── 02_1nf.sql
-│   │   ├── 03_2nf.sql
-│   │   ├── 04_3nf.sql
-│   │   └── 05_validation.sql
-│   └── relationships/
-│       ├── 01_categories.sql
-│       ├── 02_product_categories.sql
-│       └── 03_validation.sql
+│   ├── normalization/                 # UNF → 1NF → 2NF → 3NF progression
+│   │   ├── 01_unnormalized.sql        # Raw table with multi-value string columns
+│   │   ├── 02_1nf.sql                 # Atomic expansion with composite PK
+│   │   ├── 03_2nf.sql                 # Removal of partial dependencies
+│   │   ├── 04_3nf.sql                 # Final 3NF schema (orders, items, products, customers)
+│   │   └── 05_validation.sql          # Integrity queries and anomaly checks
+│   │
+│   ├── relationships/                 # Relational cardinality & junction patterns
+│   │   ├── 01_categories.sql          # Categories taxonomy table
+│   │   ├── 02_product_categories.sql  # M:N junction table with cascade constraints
+│   │   └── 03_validation.sql          # Double JOIN queries and category aggregations
+│   │
+│   ├── indexing/                      # Indexing & execution plan benchmarks
+│   │   ├── 01_orders_table.sql        # 10,000-row benchmark table definition
+│   │   └── 02_indexing_benchmarks.sql # EXPLAIN, EXPLAIN ANALYZE, composite indexes
+│   │
+│   └── transactions/                  # ACID transaction control & isolation
+│       ├── 01_commit_order.sql        # Atomic order insertion and COMMIT
+│       ├── 02_rollback_order.sql      # Constraint failure handling and ROLLBACK
+│       ├── 03_isolation_levels.sql    # Session isolation level configuration
+│       └── 04_validation.sql          # Post-transaction state validation
 │
-├── docs/
-│   ├── indexing.md
-│   ├── normalization.md
-│   └── relationships.md
+├── docs/                              # In-depth architectural references
+│   ├── normalization.md               # Normalization theory and mathematical dependencies
+│   ├── relationships.md               # Foreign key rules, cascading, and M:N resolution
+│   ├── indexing.md                    # B+Tree internals, page splits, write penalties
+│   └── transactions.md                # ACID properties, isolation levels, interview FAQ
 │
-├── README.md
-└── .gitignore
+└── seeds/                             # Synthetic data generators & seed scripts
+    ├── generate_orders_seed.py        # Python generator producing 10,000 batch order rows
+    ├── orders_seed.sql                # 10,000-row SQL dataset for indexing benchmarks
+    └── library_seed.sql               # Seed data for baseline tests
 ```
-
-### `schema.sql`
-Contains:
-* Library database creation (`library`)
-* Table definitions (`books`, `members`, `loans`)
-* Primary keys, foreign keys, and CHECK constraints
-* Sample seed data
-
-### `queries.sql`
-Contains 5 practical SQL analytical queries on the library database (overdue loans, loan counts, member activity, null filtering).
-
-### `seeds/`
-Contains standalone SQL and programmatic seed scripts:
-* `library_seed.sql` — Populates sample books, members, and loans.
-* `generate_orders_seed.py` — Python script generating 10,000 synthetic order records in batch inserts.
-* `orders_seed.sql` — 10,000-row batch dataset for indexing and query plan profiling.
-
-### `schema/`
-Contains modular SQL exercises:
-* **`indexing/`**:
-  - `01_orders_table.sql`: 10,000-row orders schema without secondary indexes.
-  - `02_indexing_benchmarks.sql`: Query plans, index creation, composite index tests, covering indexes, and storage metrics.
-* **`normalization/`**: Demonstrates decomposing an order management schema through UNF → 1NF → 2NF → 3NF along with full integrity validation queries.
-* **`relationships/`**: Demonstrates resolving Many-to-Many relationships via junction tables (`product_categories`), foreign key cascades, and category aggregations.
-
-### `docs/`
-Contains conceptual deep-dives and design documentation:
-* `indexing.md` — B-Tree internals, clustered vs secondary indexes, write penalties, page splits, execution plans, and interview solutions.
-* `normalization.md` — Normalization theory, anomaly prevention, and 1NF–3NF progression.
-* `relationships.md` — Cardinality (1:1, 1:N, M:N), junction tables, cascading foreign keys, and join queries.
-
-### `README.md`
-Contains comprehensive schema documentation, design decisions, query traces, benchmark results, and learning roadmaps.
 
 ---
 
-# 🚀 Learning Roadmap
+# 🛠️ Reproduction & Verification Guide
 
-The repository will progressively move from SQL fundamentals toward database engineering.
+To execute and verify all components locally in MySQL 8.0+:
+
+### 1. Database Initialization & Normalization
+```bash
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS order_management;"
+mysql -u root -p order_management < schema/normalization/04_3nf.sql
+mysql -u root -p order_management < schema/normalization/05_validation.sql
+```
+
+### 2. Relationships & Junction Tables
+```bash
+mysql -u root -p order_management < schema/relationships/01_categories.sql
+mysql -u root -p order_management < schema/relationships/02_product_categories.sql
+mysql -u root -p order_management < schema/relationships/03_validation.sql
+```
+
+### 3. Indexing Benchmark (10,000 Rows)
+```bash
+mysql -u root -p order_management < schema/indexing/01_orders_table.sql
+mysql -u root -p order_management < seeds/orders_seed.sql
+mysql -u root -p order_management < schema/indexing/02_indexing_benchmarks.sql
+```
+
+### 4. Transactions & ACID
+```bash
+mysql -u root -p order_management < schema/transactions/01_commit_order.sql
+mysql -u root -p order_management < schema/transactions/02_rollback_order.sql
+mysql -u root -p order_management < schema/transactions/04_validation.sql
+```
+
+---
+
+# 📈 Progression Roadmap
 
 ```text
-SQL Fundamentals
-       ↓
-Relational Database Design
-       ↓
-Joins & Aggregations
-       ↓
-Normalization
-       ↓
-Indexes & Execution Plans (Day 3)
-       ↓
-Subqueries
-       ↓
-HAVING
-       ↓
-CASE Expressions
-       ↓
-Common Table Expressions
-       ↓
-Window Functions
-       ↓
-Transactions
-       ↓
-ACID Properties
-       ↓
-Isolation Levels
-       ↓
-Concurrency
-       ↓
-JDBC
-       ↓
-Java + MySQL
-       ↓
-JPA / Hibernate
-       ↓
-Production Database Design
+Relational Schema Design
+         ↓
+Normalization (UNF → 1NF → 2NF → 3NF)
+         ↓
+Cardinality & Junction Tables (1:N, M:N)
+         ↓
+B+Tree Storage & Index Optimization
+         ↓
+Hardware Profiling (EXPLAIN ANALYZE)
+         ↓
+ACID Transactions & Isolation Levels
+         ↓
+Production Scalability & Failure Modes
+         ↓
+Java Database Integration (JDBC & Connection Pooling)
+         ↓
+ORM Frameworks (Hibernate / Spring Data JPA)
 ```
-
----
-
-# 📈 Current Progress
-
-## Database Fundamentals
-
-* [x] Schema creation
-* [x] Table design
-* [x] Primary keys
-* [x] Foreign keys
-* [x] `NOT NULL`
-* [x] `UNIQUE`
-* [x] `CHECK` constraints
-* [x] One-to-many relationships
-* [x] Many-to-many relationships (junction tables)
-* [x] Basic normalization (1NF, 2NF, 3NF)
-* [x] Indexing (B-Tree, Clustered, Secondary, Composite)
-
-## SQL & Performance
-
-* [x] `SELECT`
-* [x] `WHERE`
-* [x] `INNER JOIN`
-* [x] `LEFT JOIN`
-* [x] `GROUP BY`
-* [x] `COUNT()`
-* [x] `ORDER BY`
-* [x] `IS NULL`
-* [x] Date filtering
-* [x] Multi-table queries
-* [x] Aggregation
-* [x] Anti-join pattern
-* [x] Execution Plan Analysis (`EXPLAIN` & `EXPLAIN ANALYZE`)
-* [x] Index Optimization (Full Table Scan → B-Tree Index Lookup)
-
-## Future
-
-* [ ] Subqueries
-* [ ] `HAVING`
-* [ ] `CASE`
-* [ ] CTEs
-* [ ] Window functions
-* [ ] Transactions
-* [ ] ACID properties
-* [ ] Isolation levels
-* [ ] Concurrency
-* [ ] JDBC
-* [ ] JPA
-* [ ] Hibernate
-* [ ] Advanced database design
-
----
-
-# 🎯 Long-Term Goal
-
-The goal of this repository is not only to learn SQL syntax but to develop the ability to **design, query, analyze, integrate, and reason about relational databases used in real software systems**.
-
-The progression is:
-
-```text
-Design the Database
-        ↓
-Write Correct SQL
-        ↓
-Understand Relationships
-        ↓
-Analyze Data
-        ↓
-Optimize Queries
-        ↓
-Understand Transactions
-        ↓
-Integrate with Java
-        ↓
-Build Database-Driven Applications
-```
-
-This repository will serve as the database foundation for future **Java backend and Spring Boot projects**.
